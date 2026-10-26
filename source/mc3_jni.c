@@ -17,8 +17,8 @@
  *     folder;
  *   - objects are real runtime objects (singletons per class), never the
  *     0x42424242 placeholder;
- *   - trophies and the video player are left out (videos: mc3_main.c skips
- *     them, see mc3_video_*).
+ *   - trophies are left out; the briefing videos are played by the port
+ *     (mc3_video.c) instead of an activity.
  * MIT.
  */
 #include <stdio.h>
@@ -134,7 +134,7 @@ static JNI_H_DECL(h_put_extra) {
 }
 
 static JNI_H_DECL(h_start_activity) {
-  debugPrintf("[mc3] startActivity: video \"%s\" (skipped)\n", g_video_name);
+  debugPrintf("[mc3] startActivity: video \"%s\"\n", g_video_name);
   mc3_video_requested(g_video_name);
   return jv_none();
 }

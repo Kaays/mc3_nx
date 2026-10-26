@@ -11,3 +11,5 @@ launcher/build/
 *.so
 *.apk
 *.obb
+build-ffmpeg/
+mesa32/

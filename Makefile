@@ -11,4 +11,15 @@ PORT_NPDM_MAIN_STACK := 0xA00000
 # The engine reads its OBB zips with many small freads.
 PORT_CFLAGS += -DRT_STDIO_READ_BUF=65536
 
+# Briefing videos: with FFmpeg (tools/build_ffmpeg.sh) and Mesa in
+# portlibs32/; without them the game is told each video finished at once.
+ifneq ($(and $(wildcard $(CURDIR)/portlibs32/lib/libavcodec.a),$(wildcard $(CURDIR)/portlibs32/lib/libEGL.a)),)
+MC3_VIDEO := 1
+PORT_CFLAGS += -DMC3_VIDEO=1
+PORT_LIBS += -L$(CURDIR)/portlibs32/lib -lavformat -lavcodec -lavutil
+else
+MC3_VIDEO := 0
+endif
+PORT_STAMP := $(PORT_STAMP)-video$(MC3_VIDEO)
+
 include runtime/runtime.mk

@@ -97,7 +97,8 @@ Done (compile-checked, not yet run on hardware):
 
 Not yet:
 
-- briefing videos (skipped: the game is told each one finished);
+- briefing videos on hardware (the player is written: see below);
+
 - multiplayer (Gameloft's servers are gone, as on Android).
 
 ## Building
@@ -111,6 +112,15 @@ mkdir -p portlibs32 && curl -L <mesa32 release zip> -o /tmp/mesa32.zip \
   && unzip -q /tmp/mesa32.zip -d portlibs32/      # github.com/aks796/mesa32 releases
 ./build.sh                  # mc3_nx.nsp
 ./launcher/build.sh         # launcher/mc3_nx.nro (carries the NSP)
+```
+
+Briefing videos (optional): a small FFmpeg (MP4, H.264, MPEG-4, AAC) built
+into `portlibs32/` once. With it and Mesa there, the build plays them;
+without, the game is told each one finished at once.
+
+```sh
+tools/build_ffmpeg.sh
+./build.sh clean && ./build.sh && ./launcher/build.sh
 ```
 
 `source/imports.c` is generated: after a runtime update run

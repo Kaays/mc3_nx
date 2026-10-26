@@ -40,9 +40,41 @@ static void put(int16_t l, int16_t r) {
   }
 }
 
+/* The game's stream and a briefing video's sound share the output: while a
+ * video plays (mc3_audio_video_owner(1)) the game's writes are dropped,
+ * paced as if played, and the video's go out instead. g_lock keeps the two
+ * threads out of the block and the resampler at the same time. */
+static Mutex g_lock;
+static atomic_int g_video_owner;
+
+static void resample_out(const int16_t *pcm, int frames, int chans, int rate);
+
 void mc3_audio_write(const int16_t *pcm, int frames, int chans, int rate) {
   if (frames <= 0)
     return;
+  if (atomic_load(&g_paused) || atomic_load(&g_video_owner)) {
+    /* Paused, or a video has the output: drop the sound but take as long as
+     * it would play, so the mixer thread is still paced (it writes in a
+     * loop). */
+    svcSleepThread((int64_t)frames * 1000000000LL / (rate > 0 ? rate : 44100));
+    return;
+  }
+  mutexLock(&g_lock);
+  resample_out(pcm, frames, chans, rate);
+  mutexUnlock(&g_lock);
+}
+
+void mc3_audio_video_owner(int on) { atomic_store(&g_video_owner, on ? 1 : 0); }
+
+void mc3_audio_write_video(const int16_t *pcm, int frames, int chans, int rate) {
+  if (frames <= 0)
+    return;
+  mutexLock(&g_lock);
+  resample_out(pcm, frames, chans, rate);
+  mutexUnlock(&g_lock);
+}
+
+static void resample_out(const int16_t *pcm, int frames, int chans, int rate) {
   if (g_open < 0) {
     g_open = rt_audout_open() == 0 ? 0 : 1;
     debugPrintf("[mc3] audio: %d Hz %s in, %u Hz out%s\n", rate, chans == 1 ? "mono" : "stereo",
@@ -50,12 +82,6 @@ void mc3_audio_write(const int16_t *pcm, int frames, int chans, int rate) {
   }
   if (g_open)
     return;
-  if (atomic_load(&g_paused)) {
-    /* Paused: drop the sound but take as long as it would play, so the
-     * mixer thread is still paced (it writes in a loop). */
-    svcSleepThread((int64_t)frames * 1000000000LL / (rate > 0 ? rate : 44100));
-    return;
-  }
   unsigned out_rate = rt_audout_rate();
   if (rate <= 0)
     rate = 44100;

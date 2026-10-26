@@ -17,8 +17,9 @@
  *   The Vita port ran the engine on a thread with a 9 MB stack: here it runs
  *   on the main thread, whose stack the NPDM makes 10 MB (Makefile).
  *
- * Briefing videos (an activity on Android) are not played yet: the frame
- * after the game asks for one, it is told the video finished. MIT.
+ * Briefing videos (an activity on Android) are played between two frames
+ * (mc3_video.c, when the build has FFmpeg), then the game is told the video
+ * finished. MIT.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,11 +112,14 @@ int port_load(const char *apk) {
   return 0;
 }
 
-/* ---------------------------------------------------------------- video */
+/* ---------------------------------------------------------------- video
+ * Asked for from inside a frame (startActivity, mc3_jni.c); played after it
+ * (mc3_video.c), then the game is told it finished. */
 static volatile int g_video_pending;
+static char g_video_path[512];
 
 void mc3_video_requested(const char *name) {
-  (void)name;
+  snprintf(g_video_path, sizeof g_video_path, "%s", name ? name : "");
   g_video_pending = 1;
 }
 
@@ -202,6 +206,8 @@ void port_run(void) {
     mc3_gl_swap();
     if (g_video_pending) {
       g_video_pending = 0;
+      if (g_video_path[0])
+        mc3_video_play(g_video_path);
       if (f_video_finished)
         f_video_finished(g_jni_env, g_video_cls);
     }
