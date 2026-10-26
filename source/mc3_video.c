@@ -19,6 +19,7 @@
  * says so; the game then goes on as if the video had played. MIT.
  */
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "util.h"
@@ -342,7 +343,11 @@ int mc3_video_play(const char *android_path) {
   char real_buf[DCR_PATH_MAX], info[160];
   const char *real = dcr_translate_path(android_path, real_buf, sizeof real_buf);
   const char *name = strrchr(real, '/') ? strrchr(real, '/') + 1 : real;
-  Mc3Vid *v = mc3vid_open(real, info, sizeof info);
+  /* "file:" in front: FFmpeg would take "sdmc:" for a protocol and refuse
+   * it (hardware: "Briefing_M01.mp4: cannot open"). */
+  char url[DCR_PATH_MAX + 8];
+  snprintf(url, sizeof url, "file:%s", real);
+  Mc3Vid *v = mc3vid_open(url, info, sizeof info);
   if (!v || gl_setup() != 0) {
     debugPrintf("[video] %s: %s\n", name, v ? "no GL program" : info);
     mc3vid_close(v);

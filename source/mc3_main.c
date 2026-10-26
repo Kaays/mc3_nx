@@ -123,6 +123,60 @@ void mc3_video_requested(const char *name) {
   g_video_pending = 1;
 }
 
+/* ---------------------------------------------------------------- menus
+ * The name of the Flash menu on top (the game prints it on each key as
+ * "menuName = %s", libModernCombat3.so+0x162d34). Read the way that code
+ * reads it -- the menu manager in .bss, its map lookup (key -1: the current
+ * player), the top of that player's menu stack, an STLport string -- with the
+ * engine's own two getters, both plain reads. In gameplay it is
+ * "menu_csbars" (the HUD); the pause menu, mission failed and debriefing
+ * screens are others ("menu_IGM", "menu_fail", "menu_DEBRIEFING"), while the
+ * engine still reports gameplay. NULL when there is none (yet). */
+#define MC3_MENU_MGR   0x009508e4u /* .bss: the Flash menu manager */
+#define MC3_MENU_FIND  0x001d7878u /* map lookup: (manager, -1) -> node */
+#define MC3_MENU_TOP   0x0047c550u /* (player) -> top of its menu stack */
+
+const char *mc3_menu_name(void) {
+  uintptr_t b = (uintptr_t)g_mc3_mod.load_virtbase;
+  if (!b)
+    return NULL;
+  void *mgr = *(void **)(b + MC3_MENU_MGR);
+  if (!mgr)
+    return NULL;
+  uint8_t *(*find)(void *, int) = (uint8_t * (*)(void *, int))(b + MC3_MENU_FIND);
+  uint8_t *(*top)(void *) = (uint8_t * (*)(void *))(b + MC3_MENU_TOP);
+  uint8_t *node = find(mgr, -1);
+  if (!node)
+    return NULL;
+  void *player = *(void **)(node + 0xc);
+  if (!player)
+    return NULL;
+  uint8_t *m = top(player);
+  if (!m)
+    return NULL;
+  return (int8_t)m[8] != -1 ? (const char *)(m + 9) : *(const char **)(m + 0x14);
+}
+
+/* ---------------------------------------------------------------- logo
+ * On Android the activity showed Gameloft's logo video before the game
+ * (the engine knows it as <SD folder>/video/LOGO_Gameloft_320x480.mp4).
+ * Played from the first place it is found; nothing when it is not. */
+static void play_logo(void) {
+  static const char *const where[] = {
+      "/sdcard/Android/data/" PORT_PACKAGE "/files/video/LOGO_Gameloft_320x480.mp4",
+      "/sdcard/Android/data/" PORT_PACKAGE "/files/data/briefing/video/LOGO_Gameloft_320x480.mp4",
+      "/sdcard/Android/data/" PORT_PACKAGE "/files/data/briefing/LOGO_Gameloft_320x480.mp4",
+  };
+  for (unsigned i = 0; i < sizeof where / sizeof where[0]; i++) {
+    char buf[DCR_PATH_MAX];
+    if (rt_file_size(dcr_translate_path(where[i], buf, sizeof buf)) > 0) {
+      mc3_video_play(where[i]);
+      return;
+    }
+  }
+  debugPrintf("[video] no logo video found (LOGO_Gameloft_320x480.mp4)\n");
+}
+
 /* ---------------------------------------------------------------- focus */
 void port_focus_lost(void) {
   mc3_audio_pause(1);
@@ -168,6 +222,7 @@ void port_run(void) {
 
   if (mc3_gl_init() != 0)
     fatal_error("The graphics could not start (EGL). See debug.log.");
+  play_logo();
 
   ((jni_void_fn)need(GLF "init"))(g_jni_env, g_glf_cls);
   debugPrintf("[mc3] GL2JNILib.init done\n");

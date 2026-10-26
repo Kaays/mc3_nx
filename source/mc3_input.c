@@ -17,8 +17,9 @@
  *   L3 sprint (DPAD_UP 19)      D-pad: up sprint, down crouch, left/right weapon
  *   +  START 108                -  SELECT 109
  * A is off in gameplay as on the Vita: DPAD_CENTER there triggers an engine
- * bug the Vita port found. In the pause menu (opened with +, see
- * track_pause) A selects and B goes back, as in the other menus. In-game
+ * bug the Vita port found. On the game's other menus over gameplay (pause,
+ * mission failed, debriefing: mc3_menu_name) A selects and B goes back, as
+ * in the other menus. In-game
  * prompts (doors, pick-ups) are the game's on-screen buttons: the touch
  * screen in handheld.
  *
@@ -27,6 +28,7 @@
  * game left gameplay meanwhile. MIT.
  */
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include <switch.h>
 
@@ -224,7 +226,16 @@ void mc3_input_poll(int in_gameplay) {
     debugPrintf("[input] pause menu closed (left gameplay)\n");
   was_gameplay = in_gameplay;
   track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
-  int game_keys = in_gameplay && !g_pause_menu;
+  /* Which mapping: the game's own top menu decides when it can be read --
+   * the HUD (menu_csbars) is play, any other menu (pause, mission failed,
+   * debriefing...) takes A/B -- else the pause tracking above. */
+  const char *menu = mc3_menu_name();
+  static char last_menu[48];
+  if (menu && strncmp(menu, last_menu, sizeof last_menu - 1)) {
+    snprintf(last_menu, sizeof last_menu, "%s", menu);
+    debugPrintf("[input] menu %s\n", last_menu);
+  }
+  int game_keys = in_gameplay && (menu ? !strcmp(menu, "menu_csbars") : !g_pause_menu);
 
   for (unsigned i = 0; i < NMAP; i++) {
     int down = (held & k_map[i].button) != 0;

@@ -33,6 +33,9 @@ void mc3_gl_set_interval(int interval);
 void mc3_input_init(void);
 void mc3_input_poll(int in_gameplay);
 
+/* mc3_main.c: the Flash menu on top ("menu_csbars" in gameplay), or NULL. */
+const char *mc3_menu_name(void);
+
 /* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
 void mc3_video_requested(const char *name);
 
