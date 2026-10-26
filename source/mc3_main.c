@@ -104,6 +104,9 @@ int port_load(const char *apk) {
   so_relocate(&g_mc3_mod);
   so_resolve(&g_mc3_mod, NULL, 0, 1);
   so_fix_kuser_helpers(&g_mc3_mod);
+  /* ARMv8 has no SWP: the game's spinlocks would die at their first use. */
+  if (mc3_swp_fix(&g_mc3_mod) != 0)
+    fatal_error("Could not rewrite %s's SWP instructions (see debug.log).", MC3_LIB);
   so_finalize(&g_mc3_mod);
   debugPrintf("[mc3] %s mapped at %p\n", MC3_LIB, g_mc3_mod.load_virtbase);
   return 0;

@@ -7,6 +7,9 @@
 
 extern so_module g_mc3_mod;
 
+/* mc3_swp.c: SWP -> LDREX/STREX stubs, between so_resolve and so_finalize. */
+int mc3_swp_fix(so_module *m);
+
 /* mc3_audio.c: AudioTrack.write -> audout. frames of `chans` (1 or 2)
  * interleaved s16 at `rate` Hz; blocks while the output is full. */
 void mc3_audio_write(const int16_t *pcm, int frames, int chans, int rate);

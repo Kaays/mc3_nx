@@ -7,9 +7,9 @@ runtime. The game's own engine runs natively on the Tegra X1: no emulation.
 
 **No game code or assets are included.** You need your own copy of the game.
 
-> Status: **work in progress, not yet tested on hardware.** The loader, JNI
-> layer, audio, input and GL context are written and compile-checked; the
-> first hardware boot is the next step. See [Status](#status).
+> Status: **work in progress.** On hardware it boots through the game's whole
+> init chain into its frame loop; the first crash there (SWP) is fixed.
+> See [Status](#status).
 
 ## Requirements
 
@@ -86,6 +86,8 @@ Done (compile-checked, not yet run on hardware):
   the library's 362 imports bound (99 GL through Mesa, 260 shims/newlib,
   3 weak hooks left NULL) — `tools/imports_needed.txt`, `source/imports.c`;
 - the 1.1.7g library checked by CRC at start-up; the installer's DRM flags;
+- the game's 119 SWP instructions (undefined on ARMv8 AArch32) rewritten to
+  LDREX/STREX stubs placed over the dead `.rel.dyn` (`source/mc3_swp.c`);
 - the PS Vita port's JNI answers (FalsoJNI, name-matched) on the runtime's
   JNI through `port_jni_invoke`;
 - AudioTrack → audout, resampled 44.1 → 48 kHz;
