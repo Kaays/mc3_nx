@@ -4,10 +4,14 @@
  * a GLES 2 context, then calls into the engine from its render thread; the
  * engine itself never calls EGL (libModernCombat3.so does not link libEGL).
  * So the port makes them once, on the thread that then runs the engine,
- * before the engine's first GL call (GL2JNILib_init loads shaders). MIT.
+ * before the engine's first GL call (GL2JNILib.init loads shaders).
+ *
+ * Through the runtime's b_egl* entry points, not <EGL/egl.h>: they exist with
+ * either renderer -- gl_mesa.c (Mesa/nouveau: they also hand the screen over
+ * from the boot console and size the window) or gl_null.c (draws nothing,
+ * paces at 60 Hz) -- so this file builds with or without portlibs32/. MIT.
  */
-#define EGL_NO_X11
-#include <EGL/egl.h>
+#include <stdint.h>
 #include <switch.h>
 
 #include "dcr_boost.h"
@@ -16,22 +20,42 @@
 
 #include "mc3.h"
 
-void log_console_close(void);
+/* The EGL 1.4 values used here (Khronos egl.h). */
+typedef int32_t EGLint;
+typedef uint32_t EGLBoolean;
+#define EGL_SUCCESS             0x3000
+#define EGL_ALPHA_SIZE          0x3021
+#define EGL_BLUE_SIZE           0x3022
+#define EGL_GREEN_SIZE          0x3023
+#define EGL_RED_SIZE            0x3024
+#define EGL_DEPTH_SIZE          0x3025
+#define EGL_STENCIL_SIZE        0x3026
+#define EGL_SURFACE_TYPE        0x3033
+#define EGL_NONE                0x3038
+#define EGL_RENDERABLE_TYPE     0x3040
+#define EGL_CONTEXT_CLIENT_VERSION 0x3098
+#define EGL_WINDOW_BIT          0x0004
+#define EGL_OPENGL_ES2_BIT      0x0004
 
-static EGLDisplay s_dpy = EGL_NO_DISPLAY;
-static EGLSurface s_surf = EGL_NO_SURFACE;
-static EGLContext s_ctx = EGL_NO_CONTEXT;
+/* The runtime's (gl_mesa.c / gl_null.c). Handles are pointers in both. */
+void *b_eglGetDisplay(void *native);
+EGLBoolean b_eglInitialize(void *dpy, EGLint *major, EGLint *minor);
+EGLint b_eglGetError(void);
+EGLBoolean b_eglChooseConfig(void *dpy, const EGLint *attrs, void **configs, EGLint cap, EGLint *num);
+void *b_eglCreateWindowSurface(void *dpy, void *cfg, void *win, const EGLint *attrs);
+void *b_eglCreateContext(void *dpy, void *cfg, void *share, const EGLint *attrs);
+EGLBoolean b_eglMakeCurrent(void *dpy, void *draw, void *read, void *ctx);
+EGLBoolean b_eglSwapInterval(void *dpy, EGLint interval);
+EGLBoolean b_eglSwapBuffers(void *dpy, void *surface);
+
+static void *s_dpy, *s_surf, *s_ctx;
 
 int mc3_gl_init(void) {
-  log_console_close(); /* the console's framebuffer must let go of the window */
-  dcr_window_prepare();
-
-  s_dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-  if (s_dpy == EGL_NO_DISPLAY || !eglInitialize(s_dpy, NULL, NULL)) {
-    debugPrintf("[egl] no display (0x%x)\n", eglGetError());
+  s_dpy = b_eglGetDisplay(NULL);
+  if (!s_dpy || !b_eglInitialize(s_dpy, NULL, NULL)) {
+    debugPrintf("[egl] no display (0x%x)\n", (unsigned)b_eglGetError());
     return -1;
   }
-  eglBindAPI(EGL_OPENGL_ES_API);
 
   /* GLSurfaceView's default for GLES 2 is RGB565 + depth 16; the engine was
    * tuned on devices that gave it RGBA8888 + depth 24 (the Xperia Play). */
@@ -39,34 +63,35 @@ int mc3_gl_init(void) {
       EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
       EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
       EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8, EGL_NONE};
-  EGLConfig cfg;
+  void *cfg = NULL;
   EGLint n = 0;
-  if (!eglChooseConfig(s_dpy, cfg_attrs, &cfg, 1, &n) || n < 1) {
-    debugPrintf("[egl] no RGBA8 D24S8 config (0x%x)\n", eglGetError());
+  if (!b_eglChooseConfig(s_dpy, cfg_attrs, &cfg, 1, &n) || n < 1) {
+    debugPrintf("[egl] no RGBA8 D24S8 config (0x%x)\n", (unsigned)b_eglGetError());
     return -1;
   }
-  s_surf = eglCreateWindowSurface(s_dpy, cfg, (EGLNativeWindowType)nwindowGetDefault(), NULL);
-  if (s_surf == EGL_NO_SURFACE) {
-    debugPrintf("[egl] no window surface (0x%x)\n", eglGetError());
+  s_surf = b_eglCreateWindowSurface(s_dpy, cfg, nwindowGetDefault(), NULL);
+  if (!s_surf) {
+    debugPrintf("[egl] no window surface (0x%x)\n", (unsigned)b_eglGetError());
     return -1;
   }
   static const EGLint ctx_attrs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-  s_ctx = eglCreateContext(s_dpy, cfg, EGL_NO_CONTEXT, ctx_attrs);
-  if (s_ctx == EGL_NO_CONTEXT || !eglMakeCurrent(s_dpy, s_surf, s_surf, s_ctx)) {
-    debugPrintf("[egl] no GLES 2 context (0x%x)\n", eglGetError());
+  s_ctx = b_eglCreateContext(s_dpy, cfg, NULL, ctx_attrs);
+  if (!s_ctx || !b_eglMakeCurrent(s_dpy, s_surf, s_surf, s_ctx)) {
+    debugPrintf("[egl] no GLES 2 context (0x%x)\n", (unsigned)b_eglGetError());
     return -1;
   }
   mc3_gl_set_interval(g_mc3_cfg.fps60 ? 1 : 2);
 
   int w = 0, h = 0;
   dcr_window_size(&w, &h);
-  debugPrintf("[egl] GLES 2 context, %dx%d, %d fps\n", w, h, g_mc3_cfg.fps60 ? 60 : 30);
+  debugPrintf("[egl] GLES 2 context, %dx%d, %d fps%s\n", w, h, g_mc3_cfg.fps60 ? 60 : 30,
+              DCR_GL_MESA ? "" : " (null renderer: nothing is drawn)");
   return 0;
 }
 
 void mc3_gl_set_interval(int interval) {
-  if (s_dpy != EGL_NO_DISPLAY)
-    eglSwapInterval(s_dpy, interval);
+  if (s_dpy)
+    b_eglSwapInterval(s_dpy, interval);
 }
 
 void mc3_gl_swap(void) {
@@ -75,6 +100,6 @@ void mc3_gl_swap(void) {
     first = 0;
     dcr_boost_first_picture();
   }
-  eglSwapBuffers(s_dpy, s_surf);
+  b_eglSwapBuffers(s_dpy, s_surf);
   dcr_boost_launch_tick();
 }
