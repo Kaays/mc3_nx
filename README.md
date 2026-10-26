@@ -7,8 +7,9 @@ runtime. The game's own engine runs natively on the Tegra X1: no emulation.
 
 **No game code or assets are included.** You need your own copy of the game.
 
-> Status: **work in progress.** On hardware it boots through the game's whole
-> init chain into its frame loop; the first crash there (SWP) is fixed.
+> Status: **playable.** Tested on hardware through the first missions of the
+> campaign: menus, gameplay, sound, the Gameloft logo and the briefing
+> videos, pause / mission failed / debriefing screens, sleep and HOME.
 > See [Status](#status).
 
 ## Requirements
@@ -62,9 +63,13 @@ Saves go to `/switch/mc3_nx/data/`.
 | + / − | Start (pause) / Select | |
 | Touch screen | On-screen buttons, prompts | Menus |
 
-A does nothing in gameplay: the PS Vita port found that DPAD_CENTER there
-triggers an engine bug. In-game prompts (doors, pick-ups) are the game's
-on-screen buttons — use the touch screen in handheld.
+A does nothing during play itself: the PS Vita port found that DPAD_CENTER
+there triggers an engine bug. On every screen over gameplay (pause, mission
+failed, debriefing, skippable animations) A selects and B goes back: the port
+reads which menu the game has on top. In-game prompts (doors, pick-ups) are
+the game's on-screen buttons — use the touch screen in handheld.
+
+Videos (the Gameloft logo, the briefings): A, B, + or a tap skips.
 
 ## config.ini
 
@@ -76,11 +81,12 @@ on-screen buttons — use the touch screen in handheld.
 | controls | invert_y | false | |
 | controls | touch_screen | true | |
 | performance | boost_cpu_when_loading | true | |
-| debug | log_java_calls | false | for bug reports |
+| debug | trace_files | false | every opened file to debug.log (bug reports) |
+| debug | log_java_calls | false | every Java call to debug.log (bug reports) |
 
 ## Status
 
-Done (compile-checked, not yet run on hardware):
+Working on hardware:
 
 - android32 runtime (upstream, see `runtime/UPSTREAM_COMMIT`), every one of
   the library's 362 imports bound (99 GL through Mesa, 260 shims/newlib,
@@ -88,16 +94,17 @@ Done (compile-checked, not yet run on hardware):
 - the 1.1.7g library checked by CRC at start-up; the installer's DRM flags;
 - the game's 119 SWP instructions (undefined on ARMv8 AArch32) rewritten to
   LDREX/STREX stubs placed over the dead `.rel.dyn` (`source/mc3_swp.c`);
-- the PS Vita port's JNI answers (FalsoJNI, name-matched) on the runtime's
-  JNI through `port_jni_invoke`;
+- the PS Vita port's JNI answers on the runtime's JNI through
+  `port_jni_invoke`, with immortal strings (the engine frees its local refs
+  before it is done with their characters);
 - AudioTrack → audout, resampled 44.1 → 48 kHz;
-- Xperia Play gamepad path (keys + both touch pads), touch screen;
+- Xperia Play gamepad path (keys + both touch pads), touch screen, menus
+  over gameplay from the game's own Flash menu stack;
 - GLES 2 context on Mesa/nouveau, 720p/1080p, 60/30 fps;
+- the Gameloft logo and the briefing videos (FFmpeg, optional);
 - HOME/sleep: the game paused and resumed.
 
-Not yet:
-
-- briefing videos on hardware (the player is written: see below);
+Not done:
 
 - multiplayer (Gameloft's servers are gone, as on Android).
 

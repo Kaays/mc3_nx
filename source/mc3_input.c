@@ -221,20 +221,20 @@ void mc3_input_poll(int in_gameplay) {
   static u64 prev_held;
   u64 pressed = held & ~prev_held;
   prev_held = held;
-  static int was_gameplay;
-  if (!in_gameplay && was_gameplay && g_pause_menu)
-    debugPrintf("[input] pause menu closed (left gameplay)\n");
-  was_gameplay = in_gameplay;
-  track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
   /* Which mapping: the game's own top menu decides when it can be read --
    * the HUD (menu_csbars) is play, any other menu (pause, mission failed,
-   * debriefing...) takes A/B -- else the pause tracking above. */
+   * debriefing, a skippable animation...) takes A/B. Only when no name can
+   * be read does the + tracking stand in. */
   const char *menu = mc3_menu_name();
   static char last_menu[48];
   if (menu && strncmp(menu, last_menu, sizeof last_menu - 1)) {
     snprintf(last_menu, sizeof last_menu, "%s", menu);
     debugPrintf("[input] menu %s\n", last_menu);
   }
+  if (menu)
+    g_pause_menu = 0;
+  else
+    track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
   int game_keys = in_gameplay && (menu ? !strcmp(menu, "menu_csbars") : !g_pause_menu);
 
   for (unsigned i = 0; i < NMAP; i++) {

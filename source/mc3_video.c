@@ -154,7 +154,10 @@ static void gl_restore(const GlState *s) {
     glBindTexture(GL_TEXTURE_2D, (GLuint)s->tex[i]);
   }
   glActiveTexture((GLenum)s->active_tex);
-  glUseProgram((GLuint)s->prog);
+  /* The engine may have deleted its program while it was current: once the
+   * video's program replaced it, the name is gone (hardware: GL_INVALID_VALUE
+   * in glUseProgram after a briefing). */
+  glUseProgram(s->prog && glIsProgram((GLuint)s->prog) ? (GLuint)s->prog : 0);
   glBindBuffer(GL_ARRAY_BUFFER, (GLuint)s->array_buf);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint)s->elem_buf);
   glViewport(s->viewport[0], s->viewport[1], s->viewport[2], s->viewport[3]);
