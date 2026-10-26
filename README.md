@@ -57,7 +57,7 @@ Saves go to `/switch/mc3_nx/data/`.
 | L | Next weapon | — |
 | B | Crouch | Back |
 | A | — | Select |
-| L3 / D-pad up | Sprint | Up |
+| L3 (click) / D-pad up (hold) | Sprint | Up |
 | D-pad down | Crouch | Down |
 | D-pad left/right | Change weapon | Left/right |
 | + / − | Start (pause) / Select | |
@@ -78,6 +78,7 @@ Videos (the Gameloft logo, the briefings): A, B, + or a tap skips.
 | display | resolution | auto | 720, 1080, auto (1080 docked) |
 | display | frame_rate | 60 | 60 or 30 |
 | controls | look_speed | 1.0 | right stick speed, 0.3–3.0 |
+| controls | sprint_toggle | true | L3 click starts sprint; another click, letting go of the left stick or aiming stops it. false: hold L3 |
 | controls | invert_y | false | |
 | controls | touch_screen | true | |
 | performance | boost_cpu_when_loading | true | |

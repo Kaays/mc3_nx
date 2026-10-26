@@ -50,6 +50,7 @@ typedef struct {
   float look_speed;   /* right stick multiplier */
   int invert_y;       /* right stick Y inverted */
   int touch;          /* touch screen passed to the game */
+  int sprint_toggle;  /* L3 clicks sprint on/off instead of being held */
 } Mc3Config;
 extern Mc3Config g_mc3_cfg;
 

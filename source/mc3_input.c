@@ -15,6 +15,11 @@
  *   B  crouch (DPAD_DOWN 20)  / back (BACK 4)
  *   A  --                     / select (DPAD_CENTER 23)
  *   L3 sprint (DPAD_UP 19)      D-pad: up sprint, down crouch, left/right weapon
+ * The game sprints while DPAD_UP is held. Holding a stick click down while
+ * running is hard (hardware: the thumb slipped, sprint/walk flickered, and the
+ * breathing sound went on), so by default L3 is a toggle (sprint_toggle): one
+ * click and the port holds DPAD_UP until another click, the left stick let go
+ * for a moment, aiming (ZL), or leaving play. The D-pad's up stays a hold.
  *   +  START 108                -  SELECT 109
  * A is off in gameplay as on the Vita: DPAD_CENTER there triggers an engine
  * bug the Vita port found. On the game's other menus over gameplay (pause,
@@ -228,6 +233,25 @@ static void poll_touch(void) {
  * as soon as the player plays again (the left stick pushed, ZR or ZL). */
 static int g_pause_menu;
 
+/* The L3 sprint toggle (see the top of the file). */
+static int g_sprint;     /* DPAD_UP held for it */
+static int g_sprint_idle; /* frames the left stick has been at rest */
+
+static void sprint_toggle(int game_keys, u64 pressed, u64 held, float lx, float ly) {
+  int want = g_sprint;
+  if (game_keys && (pressed & HidNpadButton_StickL))
+    want = !g_sprint;
+  g_sprint_idle = (lx == 0.0f && ly == 0.0f) ? g_sprint_idle + 1 : 0;
+  /* a few frames' grace: L3 is often clicked as the stick starts moving */
+  if (!game_keys || g_sprint_idle > 8 || (held & HidNpadButton_ZL))
+    want = 0;
+  if (want != g_sprint) {
+    g_sprint = want;
+    debugPrintf("[input] sprint %s\n", want ? "on" : "off");
+    key(AK_DPAD_UP, want);
+  }
+}
+
 static void track_pause(int in_gameplay, u64 pressed, u64 held, float lx, float ly) {
   if (!in_gameplay) {
     g_pause_menu = 0;
@@ -272,6 +296,8 @@ void mc3_input_poll(int in_gameplay) {
   was_game_keys = game_keys;
 
   for (unsigned i = 0; i < NMAP; i++) {
+    if (k_map[i].button == HidNpadButton_StickL && g_mc3_cfg.sprint_toggle)
+      continue; /* sprint_toggle() */
     int down = (held & k_map[i].button) != 0;
     if (down && !g_held_key[i]) {
       int k = game_keys ? k_map[i].key_game : k_map[i].key_menu;
@@ -288,6 +314,8 @@ void mc3_input_poll(int in_gameplay) {
   /* left: move (y up), the Vita port's 1.1 reach so diagonals hit full speed */
   float lx = sticks[0], ly = sticks[1];
   deadzone(&lx, &ly);
+  if (g_mc3_cfg.sprint_toggle || g_sprint)
+    sprint_toggle(game_keys && g_mc3_cfg.sprint_toggle, pressed, held, lx, ly);
   feed(&g_left, f_pad_left, lx * 1.10f, ly * 1.10f, 1);
 
   /* right: look (the engine's y grows downward) */

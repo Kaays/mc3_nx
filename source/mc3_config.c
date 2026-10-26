@@ -5,7 +5,7 @@
 
 #include "mc3.h"
 
-Mc3Config g_mc3_cfg = {.fps60 = 1, .look_speed = 1.0f, .invert_y = 0, .touch = 1};
+Mc3Config g_mc3_cfg = {.fps60 = 1, .look_speed = 1.0f, .invert_y = 0, .touch = 1, .sprint_toggle = 1};
 
 static int g_boost = 1;
 static int g_fps_choice = 0; /* index into "60,30" */
@@ -24,6 +24,10 @@ static const CfgOpt k_opts[] = {
     {"controls", "invert_y", "false",
      "Invert the right stick's up/down.",
      CFG_BOOL, NULL, &g_mc3_cfg.invert_y, 0, 0, 0, 0},
+    {"controls", "sprint_toggle", "true",
+     "L3 starts sprinting with one click; it stops on another click, when the\n"
+     "# left stick is let go, or on aim. false: hold L3 (as on Android).",
+     CFG_BOOL, NULL, &g_mc3_cfg.sprint_toggle, 0, 0, 0, 0},
     {"controls", "touch_screen", "true",
      "The touch screen works in handheld (the game's on-screen buttons, menus).",
      CFG_BOOL, NULL, &g_mc3_cfg.touch, 0, 0, 0, 0},
@@ -40,10 +44,10 @@ static const CfgOpt k_opts[] = {
 
 static void apply(void) {
   g_mc3_cfg.fps60 = g_fps_choice == 0;
-  debugPrintf("[config] resolution %s, %d fps, look speed %.2f%s, touch %s, boost %s\n",
+  debugPrintf("[config] resolution %s, %d fps, look speed %.2f%s, sprint %s, touch %s, boost %s\n",
               rt_config_get("display", "resolution"), g_mc3_cfg.fps60 ? 60 : 30,
               (double)g_mc3_cfg.look_speed, g_mc3_cfg.invert_y ? " (inverted)" : "",
-              g_mc3_cfg.touch ? "on" : "off", g_boost ? "on" : "off");
+              g_mc3_cfg.sprint_toggle ? "toggle" : "hold", g_mc3_cfg.touch ? "on" : "off", g_boost ? "on" : "off");
 }
 
 /* Version 2: the game runs, so the bring-up logging goes off. Writing every
