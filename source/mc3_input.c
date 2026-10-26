@@ -157,6 +157,30 @@ static void feed(Stick *s, pad_fn fn, float x, float y, int pointer) {
 
 static Stick g_left, g_right;
 
+/* Back into play: the menus act on key-ups (the log: "processKeyUp = 19" in
+ * menu_IGM), so a play key let go while a menu, a cutscene or the pause
+ * screen was up is taken by that screen and play never sees it released --
+ * hardware: the character's sprint breathing went on after a pause. On the
+ * first frame of play again, every play key no button holds is released once
+ * more (a stray key-up is harmless in play) and both sticks are fed their
+ * (0,0) again. START and SELECT are left out: they open menus. */
+static void resync_play(void) {
+  if (!f_key)
+    return;
+  int done[AK_MAX] = {0};
+  for (unsigned i = 0; i < NMAP; i++) {
+    int k = k_map[i].key_game;
+    if (k <= 0 || k == AK_BUTTON_START || k == AK_BUTTON_SELECT || done[k] || g_key_refs[k])
+      continue;
+    done[k] = 1;
+    f_key(g_jni_env, g_cls, k, 0);
+  }
+  g_left.last_x = g_left.last_y = g_left.last2_x = g_left.last2_y = 0.0f;
+  g_right = g_left;
+  g_left.last2_x = g_right.last2_x = 1.0f; /* "was moving": (0,0) next frame */
+  debugPrintf("[input] back in play: keys released\n");
+}
+
 static void poll_touch(void) {
   static HidTouchScreenState old;
   HidTouchScreenState st;
@@ -236,6 +260,10 @@ void mc3_input_poll(int in_gameplay) {
   else
     track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
   int game_keys = in_gameplay && (menu ? !strcmp(menu, "menu_csbars") : !g_pause_menu);
+  static int was_game_keys;
+  if (game_keys && !was_game_keys)
+    resync_play();
+  was_game_keys = game_keys;
 
   for (unsigned i = 0; i < NMAP; i++) {
     int down = (held & k_map[i].button) != 0;
