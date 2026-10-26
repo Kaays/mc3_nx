@@ -114,11 +114,15 @@ static void key(int k, int down) {
   if (k <= 0 || k >= AK_MAX || !f_key)
     return;
   if (down) {
-    if (g_key_refs[k]++ == 0)
+    if (g_key_refs[k]++ == 0) {
+      debugPrintf("[input] key %d down\n", k);
       f_key(g_jni_env, g_cls, k, 1);
+    }
   } else if (g_key_refs[k] > 0) {
-    if (--g_key_refs[k] == 0)
+    if (--g_key_refs[k] == 0) {
+      debugPrintf("[input] key %d up\n", k);
       f_key(g_jni_env, g_cls, k, 0);
+    }
   }
 }
 
@@ -145,6 +149,8 @@ static void feed(Stick *s, pad_fn fn, float x, float y, int pointer) {
   int now = x != 0.0f || y != 0.0f;
   int was = s->last_x != 0.0f || s->last_y != 0.0f;
   int was2 = s->last2_x != 0.0f || s->last2_y != 0.0f;
+  if (now != was)
+    debugPrintf("[input] stick %d %s\n", pointer, now ? "moving" : "released");
   if (now || was)
     fn(g_jni_env, g_cls, x, y, pointer);
   else if (was2)
