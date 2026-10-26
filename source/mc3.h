@@ -1,0 +1,37 @@
+/* mc3.h -- what the port's files share. MIT. */
+#ifndef MC3_H
+#define MC3_H
+#include <stdint.h>
+
+#include "so_util.h"
+
+extern so_module g_mc3_mod;
+
+/* mc3_audio.c: AudioTrack.write -> audout. frames of `chans` (1 or 2)
+ * interleaved s16 at `rate` Hz; blocks while the output is full. */
+void mc3_audio_write(const int16_t *pcm, int frames, int chans, int rate);
+void mc3_audio_pause(int paused);
+void mc3_audio_shutdown(void);
+
+/* mc3_gl.c: the EGL window context, made before the game's first GL call. */
+int mc3_gl_init(void);
+void mc3_gl_swap(void);
+void mc3_gl_set_interval(int interval);
+
+/* mc3_input.c: controllers and the touch screen -> the engine. */
+void mc3_input_init(void);
+void mc3_input_poll(int in_gameplay);
+
+/* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
+void mc3_video_requested(const char *name);
+
+/* mc3_config.c: config.ini. */
+typedef struct {
+  int fps60;          /* 1: 60 fps, 0: 30 */
+  float look_speed;   /* right stick multiplier */
+  int invert_y;       /* right stick Y inverted */
+  int touch;          /* touch screen passed to the game */
+} Mc3Config;
+extern Mc3Config g_mc3_cfg;
+
+#endif /* MC3_H */

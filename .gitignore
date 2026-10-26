@@ -1,0 +1,13 @@
+build/
+*.elf
+*.nsp
+*.nro
+*.nacp
+*.build
+portlibs32/
+launcher/romfs/
+launcher/build/
+# game files never go in the repository
+*.so
+*.apk
+*.obb

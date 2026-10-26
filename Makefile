@@ -1,0 +1,14 @@
+#---------------------------------------------------------------------------------
+# Modern Combat 3 -- Nintendo Switch wrapper (32-bit / AArch32, android32)
+#
+# Ships NO game code and NO game assets: the player's own APK (1.1.7g) and OBB
+# files are read at run time. Build with ./build.sh (the toolchain container).
+#---------------------------------------------------------------------------------
+TARGET               := mc3_nx
+PORT_NPDM_PROGRAM_ID := 0x01000000000010C3
+# The engine ran on a 9 MB stack in the PS Vita port; here it runs on main.
+PORT_NPDM_MAIN_STACK := 0xA00000
+# The engine reads its OBB zips with many small freads.
+PORT_CFLAGS += -DRT_STDIO_READ_BUF=65536
+
+include runtime/runtime.mk
