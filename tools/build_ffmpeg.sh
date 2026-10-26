@@ -17,7 +17,7 @@ FFMPEG_TAG="${FFMPEG_TAG:-n6.1.2}"
 
 LIBNX32="${DCR_LIBNX32:-}"
 if [ -z "$LIBNX32" ]; then
-  for c in "$HERE/../libnx32/prefix" "$HERE/../../libnx32/prefix" "$HOME/libnx32/prefix"; do
+  for c in "$HERE/deps/libnx32/prefix" "$HERE/../libnx32/prefix" "$HERE/../../libnx32/prefix" "$HOME/libnx32/prefix"; do
     if [ -f "$c/lib/libnx.a" ]; then LIBNX32="$c"; break; fi
   done
 fi

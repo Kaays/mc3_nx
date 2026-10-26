@@ -13,3 +13,5 @@ launcher/build/
 *.obb
 build-ffmpeg/
 mesa32/
+deps/
+dist/
