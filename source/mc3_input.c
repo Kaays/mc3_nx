@@ -170,26 +170,20 @@ static Stick g_left, g_right;
 
 /* Back into play: the menus act on key-ups (the log: "processKeyUp = 19" in
  * menu_IGM), so a play key let go while a menu, a cutscene or the pause
- * screen was up is taken by that screen and play never sees it released --
- * hardware: the character's sprint breathing went on after a pause. On the
- * first frame of play again, every play key no button holds is released once
- * more (a stray key-up is harmless in play) and both sticks are fed their
- * (0,0) again. START and SELECT are left out: they open menus. */
+ * screen was up is taken by that screen and play never sees it released. On
+ * the first frame of play again, sprint (DPAD_UP) is released once more if no
+ * button holds it, and both sticks are fed their (0,0) again. Only sprint:
+ * the weapon keys act on their key-up, and a stray one switched the weapon at
+ * every mission start and every return from the pause menu (hardware). */
 static void resync_play(void) {
   if (!f_key)
     return;
-  int done[AK_MAX] = {0};
-  for (unsigned i = 0; i < NMAP; i++) {
-    int k = k_map[i].key_game;
-    if (k <= 0 || k == AK_BUTTON_START || k == AK_BUTTON_SELECT || done[k] || g_key_refs[k])
-      continue;
-    done[k] = 1;
-    f_key(g_jni_env, g_cls, k, 0);
-  }
+  if (!g_key_refs[AK_DPAD_UP])
+    f_key(g_jni_env, g_cls, AK_DPAD_UP, 0);
   g_left.last_x = g_left.last_y = g_left.last2_x = g_left.last2_y = 0.0f;
   g_right = g_left;
   g_left.last2_x = g_right.last2_x = 1.0f; /* "was moving": (0,0) next frame */
-  debugPrintf("[input] back in play: keys released\n");
+  debugPrintf("[input] back in play: sprint released\n");
 }
 
 static void poll_touch(void) {
