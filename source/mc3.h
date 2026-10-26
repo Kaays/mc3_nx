@@ -7,6 +7,11 @@
 
 extern so_module g_mc3_mod;
 
+/* mc3_setup.c: the setup step that unpacks the briefing videos. */
+#include "dcr_setup.h"
+void mc3_setup_obb(RtSetupCtx *ctx);
+extern int g_mc3_trace_files; /* every opened path to debug.log */
+
 /* mc3_swp.c: SWP -> LDREX/STREX stubs, between so_resolve and so_finalize. */
 int mc3_swp_fix(so_module *m);
 

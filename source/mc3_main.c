@@ -64,12 +64,20 @@ static void *g_activity_cls, *g_glf_cls, *g_video_cls;
 /* ---------------------------------------------------------------- setup */
 static const char *const k_libs[] = {MC3_LIB};
 
+/* After the library: the briefing videos out of the patch OBB (mc3_setup.c);
+ * it returns at once when they are there. */
+static const RtSetupStep k_steps[] = {
+    {"briefing videos", RT_STEP_AFTER_ZIP, 150, 1000, mc3_setup_obb},
+};
+
 const RtSetupPlan port_setup_plan = {
     .libs = k_libs,
     .nlibs = 1,
     .apk_requirement = "Modern Combat 3 " MC3_VERSION " (" PORT_PACKAGE ") for armeabi-v7a",
     .libs_p0 = 0,
-    .libs_p1 = 1000,
+    .libs_p1 = 150,
+    .steps = k_steps,
+    .nsteps = 1,
 };
 
 const char *port_apk_help(void) {
@@ -77,13 +85,6 @@ const char *port_apk_help(void) {
          "(any name), and its two OBB files to /switch/" PORT_NAME "/obb/:\n"
          "  " MC3_OBB_MAIN "\n"
          "  " MC3_OBB_PATCH;
-}
-
-static void check_obb(const char *name) {
-  char p[DCR_PATH_MAX];
-  snprintf(p, sizeof p, "%s/obb/%s", dcr_game_root(), name);
-  if (rt_file_size(p) <= 0)
-    fatal_error("%s is missing.\n\n%s", p, port_apk_help());
 }
 
 int port_load(const char *apk) {
@@ -94,8 +95,6 @@ int port_load(const char *apk) {
     fatal_error("This APK's %s is not the one from Modern Combat 3 %s\n"
                 "(CRC %08lx, %lu bytes; this port needs %08lx, %lu bytes).\n\n%s",
                 MC3_LIB, MC3_VERSION, crc, size, MC3_LIB_CRC32, MC3_LIB_SIZE, port_apk_help());
-  check_obb(MC3_OBB_MAIN);
-  check_obb(MC3_OBB_PATCH);
 
   char path[DCR_PATH_MAX];
   rt_root_path(path, sizeof path, MC3_LIB);

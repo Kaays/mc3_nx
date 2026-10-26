@@ -31,6 +31,10 @@ static const CfgOpt k_opts[] = {
                   &g_boost),
     CFG_ROW_GL_SELFTEST(NULL),
     CFG_ROW_BOOT_LOG("Show the start-up log on screen.", NULL),
+    {"debug", "trace_files", "true",
+     "Write every file the game opens to debug.log (while the port is being\n"
+     "# brought up; turn off once the game runs).",
+     CFG_BOOL, NULL, &g_mc3_trace_files, 0, 0, 0, 0},
     CFG_ROW_LOG_JNI("Write every Java call the game makes to debug.log (slow; for bug reports).",
                     NULL),
 };
