@@ -129,7 +129,7 @@ image [`ghcr.io/vita2hos/devcontainer/vita2hos`](https://github.com/xerpi/vita2h
 
 | Step | Command | |
 |---|---|---|
-| 1. Get the source | `git clone https://github.com/Kaays/mc3_nx.git && cd mc3_nx` | |
+| 1. Get the source | `git clone https://github.com/Kaays/mc3-nx.git && cd mc3-nx` | |
 | 2. Libraries the port links (once) | `tools/setup_deps.sh` | libnx32, Mesa, FFmpeg — the longest step |
 | 3. The game program | `./build.sh` | → `mc3_nx.nsp` |
 | 4. The NRO (carries the program) | `./launcher/build.sh` | → `launcher/mc3_nx.nro` |
