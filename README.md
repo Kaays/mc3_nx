@@ -7,7 +7,7 @@ runtime. The game's own engine runs natively on the Tegra X1: no emulation.
 
 **No game code or assets are included.** You need your own copy of the game.
 
-> Status: **playable.** Tested on hardware through the first missions of the
+> Version **1.0.0** — status: **playable.** Tested on hardware through the first missions of the
 > campaign: menus, gameplay, sound, the Gameloft logo and the briefing
 > videos, pause / mission failed / debriefing screens, sleep and HOME.
 > See [Status](#status).
@@ -108,6 +108,13 @@ Working on hardware:
 Not done:
 
 - multiplayer (Gameloft's servers are gone, as on Android).
+
+Known issues:
+
+- After a long sprint the character's heavy breathing can go on until the
+  next death or loading screen. The port releases the sprint key every time
+  (debug.log shows it); the game keeps its "out of breath" state. Not yet
+  known whether the Android game does the same.
 
 ## Building
 
