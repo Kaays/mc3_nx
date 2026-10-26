@@ -22,7 +22,9 @@
  * MIT.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <switch.h>
 
 #include "jni.h"
 #include "port_config.h"
@@ -34,8 +36,44 @@
 #define ANDROID_FILES "/sdcard/Android/data/" PORT_PACKAGE "/files/"
 #define APP_FILES     "/data/data/" PORT_PACKAGE "/files/"
 
-/* ------------------------------------------------------------ helpers */
-static jvalue ret_str(const char *s) { return jv_l(jni_str(s)); }
+/* ------------------------------------------------------------ helpers
+ * Strings handed to the game are immortal, one per value. The engine does
+ *   chars = GetStringUTFChars(s); DeleteLocalRef(s); ... use chars ...
+ * which is fine on Android (the chars are a copy that lives until
+ * ReleaseStringUTFChars) but not on the runtime, whose GetStringUTFChars
+ * returns the string's own buffer and whose DeleteLocalRef frees it at once:
+ * the OBB paths came back with malloc's free-list pointers over "/sdcard/"
+ * (hardware log: fopen("./@?)@?)Android/obb/...")). The answers are a few
+ * fixed strings, so keeping each one alive for good costs nothing. */
+static jvalue ret_str(const char *s) {
+  static struct {
+    char *val;
+    JObj *o;
+  } cache[64];
+  static int n;
+  static Mutex lock;
+  if (!s)
+    return jv_l(NULL);
+  mutexLock(&lock);
+  for (int i = 0; i < n; i++)
+    if (!strcmp(cache[i].val, s)) {
+      JObj *o = cache[i].o;
+      mutexUnlock(&lock);
+      return jv_l(o);
+    }
+  JObj *o = jni_str(s);
+  if (o) {
+    o->immortal = 1;
+    if (n < (int)(sizeof cache / sizeof cache[0])) {
+      cache[n].val = strdup(s);
+      cache[n].o = o;
+      if (cache[n].val)
+        n++;
+    }
+  }
+  mutexUnlock(&lock);
+  return jv_l(o);
+}
 
 /* A placeholder object of the method's own return class, else of its class. */
 static jvalue ret_obj_of(const JMethod *m, const char *fallback_cls) {
@@ -311,6 +349,19 @@ int port_jni_invoke(JObj *self, JMethod *m, const jvalue *args, jvalue *out) {
     if (g_jni_log)
       debugPrintf("[jni] %s.%s%s (mc3)\n", m->cls->name, m->name, m->sig);
     *out = e->fn(self, args, m);
+    return 1;
+  }
+  /* An unhandled String getter: the runtime would answer a fresh "" that the
+   * engine's DeleteLocalRef frees under it (see ret_str); answer the
+   * immortal one, and log it once, as the runtime would. */
+  const char *r = strchr(m->sig, ')');
+  if (r && !strcmp(r + 1, "Ljava/lang/String;")) {
+    if (!m->warned) {
+      ((JMethod *)m)->warned = 1;
+      debugPrintf("[jni] unhandled %s%s.%s%s: \"\"\n", m->is_static ? "static " : "", m->cls->name,
+                  m->name, m->sig);
+    }
+    *out = ret_str("");
     return 1;
   }
   return 0;
