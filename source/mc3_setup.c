@@ -89,10 +89,10 @@ void mc3_setup_obb(RtSetupCtx *ctx) {
 }
 
 /* ---------------------------------------------------------------- tracing
- * While the port is brought up: every path the game opens or stats goes to
- * debug.log ([path], [io] fopen/open/stat lines of the runtime), so a
- * missing file names itself. [debug] trace_files = false turns it off. */
-int g_mc3_trace_files = 1;
+ * [debug] trace_files: every path the game opens or stats goes to debug.log
+ * ([path], [io] fopen/open/stat lines of the runtime), so a missing file
+ * names itself. Off by default (it costs frame time). */
+int g_mc3_trace_files = 0;
 
 int dcr_path_traced(const char *p) {
   if (!p)

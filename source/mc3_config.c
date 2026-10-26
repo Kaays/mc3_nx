@@ -31,9 +31,8 @@ static const CfgOpt k_opts[] = {
                   &g_boost),
     CFG_ROW_GL_SELFTEST(NULL),
     CFG_ROW_BOOT_LOG("Show the start-up log on screen.", NULL),
-    {"debug", "trace_files", "true",
-     "Write every file the game opens to debug.log (while the port is being\n"
-     "# brought up; turn off once the game runs).",
+    {"debug", "trace_files", "false",
+     "Write every file the game opens to debug.log (slow; for bug reports).",
      CFG_BOOL, NULL, &g_mc3_trace_files, 0, 0, 0, 0},
     CFG_ROW_LOG_JNI("Write every Java call the game makes to debug.log (slow; for bug reports).",
                     NULL),
@@ -47,10 +46,21 @@ static void apply(void) {
               g_mc3_cfg.touch ? "on" : "off", g_boost ? "on" : "off");
 }
 
+/* Version 2: the game runs, so the bring-up logging goes off. Writing every
+ * Java call and file to the SD card (a flush per line, an fsync every 16)
+ * made the frame thread wait on the log lock: hitches of 120-280 ms every few
+ * seconds, right after bursts of the sound thread's AudioTrack.write lines. */
+static const CfgMigrate k_migrate[] = {
+    {"debug", "trace_files", NULL, "false", 2},
+    {"debug", "log_java_calls", NULL, "false", 2},
+};
+
 static const CfgTable k_table = {
     .opts = k_opts,
     .nopts = CFG_COUNT(k_opts),
-    .version = 1,
+    .migrate = k_migrate,
+    .nmigrate = CFG_COUNT(k_migrate),
+    .version = 2,
     .apply = apply,
 };
 

@@ -17,8 +17,10 @@
  *   L3 sprint (DPAD_UP 19)      D-pad: up sprint, down crouch, left/right weapon
  *   +  START 108                -  SELECT 109
  * A is off in gameplay as on the Vita: DPAD_CENTER there triggers an engine
- * bug the Vita port found. In-game prompts (doors, pick-ups) are the game's
- * on-screen buttons: the touch screen in handheld.
+ * bug the Vita port found. In the pause menu (opened with +, see
+ * track_pause) A selects and B goes back, as in the other menus. In-game
+ * prompts (doors, pick-ups) are the game's on-screen buttons: the touch
+ * screen in handheld.
  *
  * A key held by two buttons at once is pressed once and released when the
  * last one lets go; each button releases the key it pressed even if the
@@ -185,15 +187,49 @@ static void poll_touch(void) {
   old = st;
 }
 
+/* The pause menu: the engine still reports gameplay (isGamePlay > 0) while it
+ * is up, so the menu mapping (A select, B back) would never apply there and A
+ * did nothing (hardware: "Main Menu" in the pause menu could not be chosen).
+ * No engine flag tells it apart, so the port follows it: + in gameplay opens
+ * it (and sends START, which is what opens it in the game); it is taken as
+ * closed on + again, when the game leaves gameplay (main menu, loading), or
+ * as soon as the player plays again (the left stick pushed, ZR or ZL). */
+static int g_pause_menu;
+
+static void track_pause(int in_gameplay, u64 pressed, u64 held, float lx, float ly) {
+  if (!in_gameplay) {
+    g_pause_menu = 0;
+    return;
+  }
+  if (pressed & HidNpadButton_Plus) {
+    g_pause_menu = !g_pause_menu;
+    debugPrintf("[input] pause menu %s\n", g_pause_menu ? "open" : "closed (+)");
+    return;
+  }
+  if (g_pause_menu && ((held & (HidNpadButton_ZR | HidNpadButton_ZL)) || lx * lx + ly * ly > 0.36f)) {
+    g_pause_menu = 0;
+    debugPrintf("[input] pause menu closed (playing again)\n");
+  }
+}
+
 void mc3_input_poll(int in_gameplay) {
   padUpdate(&g_pad);
   float sticks[4] = {0};
   u64 held = rt_pad_read(&g_pad, sticks);
+  static u64 prev_held;
+  u64 pressed = held & ~prev_held;
+  prev_held = held;
+  static int was_gameplay;
+  if (!in_gameplay && was_gameplay && g_pause_menu)
+    debugPrintf("[input] pause menu closed (left gameplay)\n");
+  was_gameplay = in_gameplay;
+  track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
+  int game_keys = in_gameplay && !g_pause_menu;
 
   for (unsigned i = 0; i < NMAP; i++) {
     int down = (held & k_map[i].button) != 0;
     if (down && !g_held_key[i]) {
-      int k = in_gameplay ? k_map[i].key_game : k_map[i].key_menu;
+      int k = game_keys ? k_map[i].key_game : k_map[i].key_menu;
       if (k) {
         g_held_key[i] = k;
         key(k, 1);
