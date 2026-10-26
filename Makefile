@@ -23,3 +23,7 @@ endif
 PORT_STAMP := $(PORT_STAMP)-video$(MC3_VIDEO)
 
 include runtime/runtime.mk
+
+# FFmpeg assumes int-sized enums; devkitARM defaults to short ones. The one
+# file that touches FFmpeg's structs is built like FFmpeg (mc3_video_ff.h).
+$(BUILD)/mc3_video_ff.o: CFLAGS += -fno-short-enums

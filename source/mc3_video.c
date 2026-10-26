@@ -37,13 +37,12 @@ int mc3_video_play(const char *android_path) {
 #include <stdlib.h>
 #include <switch.h>
 #include <GLES2/gl2.h>
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/imgutils.h>
 
 #include "dcr_path.h"
 #include "rt_applet.h"
 #include "rt_window.h"
+
+#include "mc3_video_ff.h"
 
 /* ---------------------------------------------------------------- GL */
 static const char *k_vs =
@@ -203,17 +202,16 @@ static void upload(int i, const uint8_t *data, int linesize, int w, int h, int r
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_LUMINANCE, GL_UNSIGNED_BYTE, src);
 }
 
-static void draw(const AVFrame *f, int realloc_tex) {
+static void draw(const Mc3VidPic *f, int realloc_tex) {
   int ww = 1280, wh = 720;
   dcr_window_size(&ww, &wh);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  upload(0, f->data[0], f->linesize[0], f->width, f->height, realloc_tex);
-  upload(1, f->data[1], f->linesize[1], (f->width + 1) / 2, (f->height + 1) / 2, realloc_tex);
-  upload(2, f->data[2], f->linesize[2], (f->width + 1) / 2, (f->height + 1) / 2, realloc_tex);
+  upload(0, f->plane[0], f->linesize[0], f->w, f->h, realloc_tex);
+  upload(1, f->plane[1], f->linesize[1], (f->w + 1) / 2, (f->h + 1) / 2, realloc_tex);
+  upload(2, f->plane[2], f->linesize[2], (f->w + 1) / 2, (f->h + 1) / 2, realloc_tex);
 
   /* letterbox: the picture's aspect (sample aspect included) in the window */
-  double sar = f->sample_aspect_ratio.num > 0 ? av_q2d(f->sample_aspect_ratio) : 1.0;
-  double pic = (double)f->width * sar / (double)f->height, win = (double)ww / (double)wh;
+  double pic = (double)f->w * f->sar / (double)f->h, win = (double)ww / (double)wh;
   float sx = 1.0f, sy = 1.0f;
   if (pic > win)
     sy = (float)(win / pic);
@@ -302,31 +300,16 @@ static void audio_stop(int flush) {
   g_audio_run = 0;
 }
 
-static float sample_at(const AVFrame *f, int ch, int i) {
-  int nch = f->ch_layout.nb_channels;
-  switch (f->format) {
-  case AV_SAMPLE_FMT_FLTP: return ((const float *)f->extended_data[ch])[i];
-  case AV_SAMPLE_FMT_FLT: return ((const float *)f->extended_data[0])[i * nch + ch];
-  case AV_SAMPLE_FMT_S16P: return ((const int16_t *)f->extended_data[ch])[i] / 32768.0f;
-  case AV_SAMPLE_FMT_S16: return ((const int16_t *)f->extended_data[0])[i * nch + ch] / 32768.0f;
-  default: return 0.0f;
-  }
-}
-
-/* Into the ring; waits (rarely) while it is full. */
-static void queue_audio(const AVFrame *f) {
-  int n = f->nb_samples, nch = f->ch_layout.nb_channels;
-  if (n <= 0 || nch <= 0)
-    return;
-  g_ring_rate = f->sample_rate;
+/* Into the ring (mc3vid_next's sound callback); waits, rarely, while full. */
+static void queue_audio(const int16_t *pcm, int n, int rate, void *ud) {
+  (void)ud;
+  g_ring_rate = rate;
   for (int i = 0; i < n; i++) {
     while (g_ring_w - g_ring_r >= RING_FRAMES && g_audio_run)
       svcSleepThread(2000000LL);
     unsigned k = g_ring_w % RING_FRAMES;
-    for (int c = 0; c < 2; c++) {
-      float v = sample_at(f, nch > 1 ? c : 0, i) * 32767.0f;
-      g_ring[k * 2 + c] = (int16_t)(v > 32767.0f ? 32767 : v < -32768.0f ? -32768 : v);
-    }
+    g_ring[k * 2] = pcm[i * 2];
+    g_ring[k * 2 + 1] = pcm[i * 2 + 1];
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
     g_ring_w++;
   }
@@ -355,137 +338,65 @@ static int skip_pressed(void) {
 /* ---------------------------------------------------------------- play */
 static uint64_t now_us(void) { return armTicksToNs(armGetSystemTick()) / 1000; }
 
-static AVCodecContext *open_decoder(AVStream *st) {
-  const AVCodec *c = avcodec_find_decoder(st->codecpar->codec_id);
-  if (!c)
-    return NULL;
-  AVCodecContext *ctx = avcodec_alloc_context3(c);
-  if (!ctx)
-    return NULL;
-  if (avcodec_parameters_to_context(ctx, st->codecpar) < 0 || avcodec_open2(ctx, c, NULL) < 0) {
-    avcodec_free_context(&ctx);
-    return NULL;
-  }
-  return ctx;
-}
-
 int mc3_video_play(const char *android_path) {
-  char real_buf[DCR_PATH_MAX];
+  char real_buf[DCR_PATH_MAX], info[160];
   const char *real = dcr_translate_path(android_path, real_buf, sizeof real_buf);
-  AVFormatContext *fmt = NULL;
-  if (avformat_open_input(&fmt, real, NULL, NULL) < 0) {
-    debugPrintf("[video] %s: cannot open\n", real);
+  const char *name = strrchr(real, '/') ? strrchr(real, '/') + 1 : real;
+  Mc3Vid *v = mc3vid_open(real, info, sizeof info);
+  if (!v || gl_setup() != 0) {
+    debugPrintf("[video] %s: %s\n", name, v ? "no GL program" : info);
+    mc3vid_close(v);
     return -1;
   }
-  if (avformat_find_stream_info(fmt, NULL) < 0) {
-    avformat_close_input(&fmt);
-    return -1;
-  }
-  int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
-  int ai = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
-  AVCodecContext *vd = vi >= 0 ? open_decoder(fmt->streams[vi]) : NULL;
-  AVCodecContext *ad = ai >= 0 ? open_decoder(fmt->streams[ai]) : NULL;
-  if (!vd || gl_setup() != 0) {
-    debugPrintf("[video] %s: no playable picture (decoder %s)\n", real, vd ? "ok" : "missing");
-    avcodec_free_context(&vd);
-    avcodec_free_context(&ad);
-    avformat_close_input(&fmt);
-    return -1;
-  }
-  debugPrintf("[video] %s: %dx%d %s%s%s\n", strrchr(real, '/') ? strrchr(real, '/') + 1 : real,
-              vd->width, vd->height, vd->codec->name, ad ? ", sound " : "", ad ? ad->codec->name : "");
+  debugPrintf("[video] %s: %s\n", name, info);
 
+  int sound = mc3vid_has_audio(v);
+  if (sound && audio_start() != 0) {
+    debugPrintf("[video] no sound thread: playing without sound\n");
+    sound = 0;
+  }
+  if (sound)
+    mc3_audio_video_owner(1);
   GlState saved;
   gl_save(&saved);
-  if (ad && audio_start() != 0) {
-    debugPrintf("[video] no sound thread: playing without sound\n");
-    avcodec_free_context(&ad);
-  }
-  if (ad)
-    mc3_audio_video_owner(1);
 
-  AVPacket *pkt = av_packet_alloc();
-  AVFrame *frame = av_frame_alloc();
-  AVRational vtb = fmt->streams[vi]->time_base;
+  Mc3VidPic pic;
   uint64_t t0 = 0;
-  int64_t first_pts = AV_NOPTS_VALUE;
-  int tex_w = 0, tex_h = 0, frames = 0, dropped = 0, skipped = 0, bad_fmt = 0, eof = 0;
-
-  while (!skipped && !rt_exit_requested() && appletMainLoop()) {
+  int tex_w = 0, tex_h = 0, shown = 0, late = 0, skipped = 0, ended = 0;
+  while (!rt_exit_requested() && appletMainLoop()) {
     rt_applet_poll();
     if (skip_pressed()) {
       skipped = 1;
       break;
     }
-    if (!eof) {
-      int r = av_read_frame(fmt, pkt);
-      if (r < 0) {
-        eof = 1;
-        avcodec_send_packet(vd, NULL); /* drain */
-        if (ad)
-          avcodec_send_packet(ad, NULL);
-      } else if (pkt->stream_index == ai && ad) {
-        if (avcodec_send_packet(ad, pkt) == 0)
-          while (avcodec_receive_frame(ad, frame) == 0)
-            queue_audio(frame);
-        av_packet_unref(pkt);
-        continue;
-      } else if (pkt->stream_index == vi) {
-        avcodec_send_packet(vd, pkt);
-        av_packet_unref(pkt);
-      } else {
-        av_packet_unref(pkt);
-        continue;
-      }
-    }
-    int got = 0;
-    while (avcodec_receive_frame(vd, frame) == 0) {
-      got = 1;
-      if (frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_YUVJ420P) {
-        if (!bad_fmt++)
-          debugPrintf("[video] pixel format %d not handled: picture skipped\n", frame->format);
-        continue;
-      }
-      int64_t pts = frame->best_effort_timestamp;
-      if (pts == AV_NOPTS_VALUE)
-        pts = first_pts == AV_NOPTS_VALUE ? 0 : first_pts;
-      if (first_pts == AV_NOPTS_VALUE) {
-        first_pts = pts;
-        t0 = now_us();
-      }
-      uint64_t due = t0 + (uint64_t)(av_q2d(vtb) * (double)(pts - first_pts) * 1e6);
-      uint64_t now = now_us();
-      if (now + 1000 < due)
-        svcSleepThread((int64_t)(due - now) * 1000);
-      else if (now > due + 100000) { /* over 100 ms late: decode, do not draw */
-        dropped++;
-        continue;
-      }
-      int realloc_tex = frame->width != tex_w || frame->height != tex_h;
-      tex_w = frame->width;
-      tex_h = frame->height;
-      draw(frame, realloc_tex);
-      mc3_gl_swap();
-      frames++;
-    }
-    if (eof && !got)
+    int r = mc3vid_next(v, &pic, sound ? queue_audio : NULL, NULL);
+    if (r <= 0) {
+      ended = 1;
       break;
+    }
+    if (!shown && !late)
+      t0 = now_us(); /* the clock starts at the first picture */
+    uint64_t due = t0 + (uint64_t)pic.pts_us, now = now_us();
+    if (now + 1000 < due) {
+      svcSleepThread((int64_t)(due - now) * 1000);
+    } else if (now > due + 100000) { /* over 100 ms late: decoded, not drawn */
+      late++;
+      continue;
+    }
+    int realloc_tex = pic.w != tex_w || pic.h != tex_h;
+    tex_w = pic.w;
+    tex_h = pic.h;
+    draw(&pic, realloc_tex);
+    mc3_gl_swap();
+    shown++;
   }
-  if (ad && eof && !skipped) /* the decoder's last frames */
-    while (avcodec_receive_frame(ad, frame) == 0)
-      queue_audio(frame);
-  if (ad)
-    audio_stop(eof && !skipped); /* played out, or cut off (skip, exit) */
-
-  debugPrintf("[video] %d pictures shown, %d late%s\n", frames, dropped, skipped ? ", skipped" : "");
-  av_frame_free(&frame);
-  av_packet_free(&pkt);
-  avcodec_free_context(&vd);
-  avcodec_free_context(&ad);
-  avformat_close_input(&fmt);
-  if (ad)
+  if (sound) {
+    audio_stop(ended && !skipped); /* played out, or cut off (skip, exit) */
     mc3_audio_video_owner(0);
+  }
   gl_restore(&saved);
+  mc3vid_close(v);
+  debugPrintf("[video] %d pictures shown, %d late%s\n", shown, late, skipped ? ", skipped" : "");
   return 0;
 }
 
