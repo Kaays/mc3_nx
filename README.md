@@ -1,6 +1,6 @@
 <div align=center>
 
-<img src="launcher/icon.jpg" alt="Modern Combat 3" width="160">
+<img src="extras/banner.jpg" alt="Modern Combat 3: Fallen Nation" width="100%">
 
 </div>
 <h1 align=center>mc3_nx — Modern Combat 3: Fallen Nation for Nintendo Switch</h1>
@@ -208,8 +208,8 @@ This port only exists because of the work of these people and projects:
 ## Legal
 
 Unofficial fan project, not affiliated with or endorsed by Gameloft or Nintendo. Modern Combat and Gameloft are
-trademarks of Gameloft; Nintendo Switch is a trademark of Nintendo. The icon is the game's cover art, © Gameloft,
-used only to identify the game. The repository and the releases contain no program code or assets from the game:
+trademarks of Gameloft; Nintendo Switch is a trademark of Nintendo. The icon and the banner are the game's artwork,
+© Gameloft, used only to identify the game. The repository and the releases contain no program code or assets from the game:
 each player supplies their own legally obtained copy. Running homebrew requires custom firmware, which violates
 Nintendo's terms of service and can get a console banned.
 

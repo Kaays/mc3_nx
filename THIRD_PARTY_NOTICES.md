@@ -35,5 +35,5 @@ through `tools/build_ffmpeg.sh`, then `./build.sh clean && ./build.sh && ./launc
 ## Trademarks
 
 Modern Combat and Gameloft are trademarks of Gameloft. Nintendo Switch is a trademark of Nintendo. Xperia is a
-trademark of Sony. The launcher icon (`launcher/icon.jpg`) is the game's cover art, © Gameloft, used to identify the
-game. This project is not affiliated with or endorsed by any of them.
+trademark of Sony. The launcher icon (`launcher/icon.jpg`) and the README banner (`extras/banner.jpg`) are the game's
+artwork, © Gameloft, used to identify the game. This project is not affiliated with or endorsed by any of them.
