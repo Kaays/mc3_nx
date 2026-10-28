@@ -41,6 +41,8 @@ const char *mc3_menu_name(void);
 #define MC3_PROMPT_ANY  1 /* a prompt A (DPAD_CENTER) takes */
 #define MC3_PROMPT_DRAG 2 /* the DraggableQTE: a bar filled with a finger */
 int mc3_hud_prompts(void);
+/* A on a prompt: the Hud event the game's key path would set. 1 if one was. */
+int mc3_hud_use(void);
 
 /* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
 void mc3_video_requested(const char *name);

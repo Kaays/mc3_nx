@@ -13,7 +13,7 @@
  *   Y  reload (X 99)            X  BUTTON_Y 100
  *   R  grenade (MOVE_END 123)   L  next weapon (DPAD_RIGHT 22)
  *   B  crouch (DPAD_DOWN 20)  / back (BACK 4)
- *   A  use (DPAD_CENTER 23)    / select (DPAD_CENTER 23)
+ *   A  the prompt on screen    / select (DPAD_CENTER 23)
  *   L3 sprint (DPAD_UP 19)      D-pad: up sprint, down crouch, left/right weapon
  * The game sprints while DPAD_UP is held. Holding a stick click down while
  * running is hard (hardware: the thumb slipped, sprint/walk flickered, and the
@@ -21,12 +21,12 @@
  * click and the port holds DPAD_UP until another click, the left stick let go
  * for a moment, aiming (ZL), or leaving play. The D-pad's up stays a hold.
  *   +  START 108                -  SELECT 109
- * A in gameplay: the Xperia Play's centre key, which the game turns into
- * whatever prompt is on screen (a computer, a door, a bomb, a grenade to
- * throw back, a melee counter, a QTE: mc3_hud_prompts). The Vita port kept it
- * off in gameplay for an engine bug it did not describe, so here it is sent
- * only while such a prompt is up -- when the game's own key path would use
- * it -- and never otherwise. On the game's other menus over gameplay (pause,
+ * A in gameplay: what the Xperia Play's centre key does there -- the prompt
+ * on screen (a computer, a door, a bomb, a weapon on the ground, a grenade to
+ * throw back, a melee counter, a QTE) -- without the key itself, which the
+ * Vita port kept off in gameplay for an engine bug and which went wrong here
+ * too: mc3_hud_use sets the game's own event for the prompt, only for
+ * prompts that are really up (mc3_main.c). On the game's other menus over gameplay (pause,
  * mission failed, debriefing: mc3_menu_name) A selects and B goes back, as
  * in the other menus. The bar filled with a finger (DraggableQTE) also takes
  * the right stick as a finger, for docked play: flick it the way the finger
@@ -80,7 +80,7 @@ static const Map k_map[] = {
     {HidNpadButton_R, AK_MOVE_END, AK_MOVE_END},
     {HidNpadButton_L, AK_DPAD_RIGHT, AK_NONE},
     {HidNpadButton_B, AK_DPAD_DOWN, AK_BACK},
-    {HidNpadButton_A, AK_DPAD_CENTER, AK_DPAD_CENTER}, /* in play: only on a prompt */
+    {HidNpadButton_A, AK_NONE, AK_DPAD_CENTER}, /* in play: mc3_hud_use */
     {HidNpadButton_StickL, AK_DPAD_UP, AK_NONE},
     {HidNpadButton_Up, AK_DPAD_UP, AK_DPAD_UP},
     {HidNpadButton_Down, AK_DPAD_DOWN, AK_DPAD_DOWN},
@@ -318,7 +318,7 @@ void mc3_input_poll(int in_gameplay) {
   static int last_prompts;
   if (prompts != last_prompts) {
     debugPrintf("[input] %s\n", prompts & MC3_PROMPT_DRAG  ? "drag bar up: touch and the right stick"
-                                 : prompts & MC3_PROMPT_ANY ? "prompt up: A uses it"
+                                 : prompts & MC3_PROMPT_ANY ? "prompt up: A takes it"
                                                             : "no prompt");
     last_prompts = prompts;
   }
@@ -333,8 +333,6 @@ void mc3_input_poll(int in_gameplay) {
     int down = (held & k_map[i].button) != 0;
     if (down && !g_held_key[i]) {
       int k = game_keys ? k_map[i].key_game : k_map[i].key_menu;
-      if (game_keys && k_map[i].button == HidNpadButton_A && !(prompts & MC3_PROMPT_ANY))
-        k = 0; /* no prompt: the centre key stays off in play, as on the Vita */
       if (k) {
         g_held_key[i] = k;
         key(k, 1);
@@ -344,6 +342,9 @@ void mc3_input_poll(int in_gameplay) {
       g_held_key[i] = 0;
     }
   }
+
+  if (game_keys && (pressed & HidNpadButton_A) && (prompts & MC3_PROMPT_ANY))
+    mc3_hud_use();
 
   /* left: move (y up), the Vita port's 1.1 reach so diagonals hit full speed */
   float lx = sticks[0], ly = sticks[1];

@@ -158,43 +158,109 @@ const char *mc3_menu_name(void) {
 }
 
 /* ---------------------------------------------------------------- hud
- * What the Xperia Play's centre key would act on. The game's own key path
- * (libModernCombat3.so+0x20bae0, the Hud's controls: Xperia keys through the
- * engine's key state) turns DPAD_CENTER into a Hud event when one of these
- * HUD controls is up, and does nothing with it otherwise:
- *   ClickableObject (+0x7ac, the button that follows a computer, a door...),
+ * The on-screen prompts, and A for them. The game's Xperia key path
+ * (libModernCombat3.so+0x20bae0, the Hud's controls) turns the centre key
+ * into a Hud event (a byte in the array at Hud+0xa28) for the prompt on
+ * screen:
+ *   ClickableObject (+0x7ac: the button that follows a computer, a door...),
  *   ClickableQTE (+0x7b0), DraggableQTE (+0x7b4)            -> event 34, "use"
- *   GrenadeThrowback (+0x7f0) -> 23   MeleeBack (+0x7f4) -> 10
- *   +0xa78 -> 4, +0xa7c -> 5, +0x818 -> 37 (the other on-screen prompts)
- * A control is up when its byte +0x78 is set. The Hud is the game object's
- * (.bss +0x950e08) +0x18, the one that function is called with (+0x14d1c4).
- * Plain reads, each pointer checked. Bit 1: a prompt is up; bit 2: the
- * DraggableQTE (the bar filled with a finger). */
-#define MC3_GAME_OBJ 0x00950e08u
+ *   otherwise: GrenadeThrowback (+0x7f0) -> 23, the two action buttons
+ *   (+0xa78 -> 4, +0xa7c -> 5: a weapon on the ground...), +0x818 -> 37,
+ *   MeleeBack (+0x7f4) -> 10.
+ * It only asks whether a control is active (+0x78), and the computer's
+ * ClickableObject stayed active after it was used (hardware, with A sent as
+ * DPAD_CENTER: every press became "use" again, reload and weapon switch
+ * stopped, a weapon on the ground could not be taken, then a crash -- likely
+ * the engine bug the Vita port kept the key off for). So the port does not
+ * send the key: it sets the same events itself, for the controls that are
+ * active and touchable, as the engine's touch test takes them (+0x21cdf0):
+ * ctl_live. The Hud is the game object's (.bss +0x950e08) +0x18, the one the
+ * key path is called with (+0x14d1c4). Plain reads, each pointer checked. */
+#define MC3_GAME_OBJ   0x00950e08u
+#define HUD_EVENTS     0xa28
+#define EV_USE         34
 
-static int ctl_up(const uint8_t *hud, unsigned off) {
-  const uint8_t *c = *(const uint8_t *const *)(hud + off);
-  return c && c[0x78];
+static const struct {
+  unsigned off;
+  int event;
+  const char *name;
+} k_prompts[] = {
+    {0x7ac, EV_USE, "ClickableObject"}, {0x7b0, EV_USE, "ClickableQTE"}, {0x7b4, EV_USE, "DraggableQTE"},
+    {0x7f0, 23, "GrenadeThrowback"},    {0xa78, 4, "Action0"},           {0xa7c, 5, "Action1"},
+    {0x818, 37, "+0x818"},              {0x7f4, 10, "MeleeBack"},
+};
+#define NPROMPTS (sizeof k_prompts / sizeof k_prompts[0])
+
+/* Active, and touchable: either +0x7d or, when the control has its own touch
+ * rule (+0x29d), that rule's flag (+0x29c); a container through any of its
+ * children (+0x8c of them at +0x90), as the engine's touch test. */
+static int ctl_live(const uint8_t *c, int depth) {
+  if (!c || !c[0x78])
+    return 0;
+  int n = *(const int32_t *)(c + 0x8c);
+  const uint8_t *const *kids = *(const uint8_t *const *const *)(c + 0x90);
+  if (depth < 2 && n > 0 && n < 64 && kids)
+    for (int i = 0; i < n; i++)
+      if (ctl_live(kids[i], depth + 1))
+        return 1;
+  return c[0x29d] ? c[0x29c] : c[0x7d];
+}
+
+static uint8_t *mc3_hud(void) {
+  uintptr_t b = (uintptr_t)g_mc3_mod.load_virtbase;
+  if (!b)
+    return NULL;
+  uint8_t *gp = *(uint8_t **)(b + MC3_GAME_OBJ);
+  return gp ? *(uint8_t **)(gp + 0x18) : NULL;
+}
+
+/* Bit i: k_prompts[i] is live. */
+static unsigned live_prompts(const uint8_t *hud) {
+  unsigned up = 0;
+  for (unsigned i = 0; i < NPROMPTS; i++)
+    if (ctl_live(*(const uint8_t *const *)(hud + k_prompts[i].off), 0))
+      up |= 1u << i;
+  return up;
 }
 
 int mc3_hud_prompts(void) {
-  uintptr_t b = (uintptr_t)g_mc3_mod.load_virtbase;
-  if (!b)
-    return 0;
-  const uint8_t *gp = *(const uint8_t *const *)(b + MC3_GAME_OBJ);
-  if (!gp)
-    return 0;
-  const uint8_t *hud = *(const uint8_t *const *)(gp + 0x18);
+  const uint8_t *hud = mc3_hud();
+  unsigned up = hud ? live_prompts(hud) : 0;
+  static unsigned last_up;
+  if (up != last_up) { /* which prompt, for bug reports */
+    char line[160] = "";
+    for (unsigned i = 0; i < NPROMPTS; i++)
+      if (up & (1u << i)) {
+        strncat(line, " ", sizeof line - strlen(line) - 1);
+        strncat(line, k_prompts[i].name, sizeof line - strlen(line) - 1);
+      }
+    debugPrintf("[hud] prompts:%s\n", up ? line : " none");
+    last_up = up;
+  }
+  return (up ? MC3_PROMPT_ANY : 0) | ((up & 4u) ? MC3_PROMPT_DRAG : 0);
+}
+
+/* A: the events the key path would set, for the live prompts (the clickable
+ * ones first, the others only without them, as the key path orders them). */
+int mc3_hud_use(void) {
+  uint8_t *hud = mc3_hud();
   if (!hud)
     return 0;
-  static const unsigned prompts[] = {0x7ac, 0x7b0, 0x7b4, 0x7f0, 0x7f4, 0xa78, 0xa7c, 0x818};
-  int r = 0;
-  for (unsigned i = 0; i < sizeof prompts / sizeof prompts[0]; i++)
-    if (ctl_up(hud, prompts[i]))
-      r |= MC3_PROMPT_ANY;
-  if (ctl_up(hud, 0x7b4))
-    r |= MC3_PROMPT_DRAG;
-  return r;
+  uint8_t *ev = *(uint8_t **)(hud + HUD_EVENTS);
+  unsigned up = live_prompts(hud);
+  if (!ev || !up)
+    return 0;
+  if (up & 7u) {
+    ev[EV_USE] = 1;
+    debugPrintf("[hud] A: use (event %d)\n", EV_USE);
+    return 1;
+  }
+  for (unsigned i = 3; i < NPROMPTS; i++)
+    if (up & (1u << i)) {
+      ev[k_prompts[i].event] = 1;
+      debugPrintf("[hud] A: %s (event %d)\n", k_prompts[i].name, k_prompts[i].event);
+    }
+  return 1;
 }
 
 /* ---------------------------------------------------------------- logo
