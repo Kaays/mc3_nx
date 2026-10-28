@@ -20,7 +20,8 @@
  * breathing sound went on), so by default L3 is a toggle (sprint_toggle): one
  * click and the port holds DPAD_UP until another click, the left stick let go
  * for a moment, aiming (ZL), or leaving play. The D-pad's up stays a hold.
- *   +  START 108                -  SELECT 109
+ *   +  START 108 (in a skippable cutscene, menu_SkipAnim: skip it, as the
+ *      ">>" button)              -  SELECT 109
  * A in gameplay: what the Xperia Play's centre key does there -- the prompt
  * on screen (a computer, a door, a bomb, a weapon on the ground, a grenade to
  * throw back, a melee counter, a QTE) -- without the key itself, which the
@@ -322,6 +323,9 @@ void mc3_input_poll(int in_gameplay) {
                                                             : "no prompt");
     last_prompts = prompts;
   }
+  int skip_anim = menu && !strcmp(menu, "menu_SkipAnim");
+  if (skip_anim && (pressed & HidNpadButton_Plus))
+    mc3_hud_skip();
   static int was_game_keys;
   if (game_keys && !was_game_keys)
     resync_play();
@@ -333,6 +337,10 @@ void mc3_input_poll(int in_gameplay) {
     int down = (held & k_map[i].button) != 0;
     if (down && !g_held_key[i]) {
       int k = game_keys ? k_map[i].key_game : k_map[i].key_menu;
+      if (skip_anim && k_map[i].button == HidNpadButton_Plus) {
+        g_held_key[i] = -1; /* + skips there (above): no pause, now or when play resumes under it */
+        continue;
+      }
       if (k) {
         g_held_key[i] = k;
         key(k, 1);

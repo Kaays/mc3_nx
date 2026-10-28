@@ -94,7 +94,7 @@ itself. Your saves and settings stay. **Uninstall**: delete the forwarder in the
 | D-pad up (hold) | Sprint | Up |
 | D-pad down | Crouch | Down |
 | D-pad left/right | Change weapon | Left/right |
-| + / − | Pause / Select | |
+| + / − | Pause (in a skippable cutscene: skip it, as the ">>" button) / Select | |
 | Touch screen | On-screen buttons, prompts | Menus |
 
 On every screen over gameplay (pause, mission failed, debriefing, skippable animations) A selects and B goes back:

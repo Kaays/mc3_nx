@@ -25,9 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+#include <unistd.h>
 
 #include "jni.h"
 #include "port_config.h"
+#include "rt_applet.h"
 #include "util.h"
 
 #include "mc3.h"
@@ -177,6 +179,20 @@ static JNI_H_DECL(h_audiotrack_write) {
 }
 
 static JNI_H_DECL(h_audio_min_buffer) { return jv_i(4096); }
+/* Exit (the main menu's quit, Yes in its confirm box): a static Exit() the
+ * runtime did not answer (hardware: "[jni] unhandled static ...Exit()V", and
+ * the game stayed). On a phone the activity finishes and the process ends;
+ * here too, at once, as the MC4 port found best: the game's own shutdown
+ * after a quit is not needed and is where such ports crash. */
+static JNI_H_DECL(h_exit) {
+  debugPrintf("[mc3] Exit: leaving\n");
+  rt_request_exit();
+  mc3_audio_shutdown();
+  log_flush_ring();
+  _exit(0);
+  return jv_none();
+}
+
 static JNI_H_DECL(h_audio_rate) { return jv_i(44100); }
 static JNI_H_DECL(h_audio_play) { mc3_audio_pause(0); return jv_none(); }
 static JNI_H_DECL(h_audio_pause) { mc3_audio_pause(1); return jv_none(); }
@@ -254,6 +270,7 @@ static const Mc3Method k_methods[] = {
     {"hideloading", NULL, jni_h_void},
     {"hidelogoscreen", NULL, jni_h_void},
     {"finish", NULL, jni_h_void},
+    {"Exit", NULL, h_exit},
     {"getContext", NULL, h_context},
     {"getWindow", NULL, h_window},
     {"getWindowManager", NULL, h_window_manager},

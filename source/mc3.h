@@ -43,6 +43,8 @@ const char *mc3_menu_name(void);
 int mc3_hud_prompts(void);
 /* A on a prompt: the Hud event the game's key path would set. 1 if one was. */
 int mc3_hud_use(void);
+/* + in a skippable cutscene: the ">>" button's SkipCutscene. 1 if sent. */
+int mc3_hud_skip(void);
 
 /* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
 void mc3_video_requested(const char *name);

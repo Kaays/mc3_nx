@@ -263,6 +263,21 @@ int mc3_hud_use(void) {
   return 1;
 }
 
+/* + in a skippable cutscene (menu_SkipAnim, the ">>" button in the corner):
+ * what that button sends, the Flash command "SkipCutscene", which the game's
+ * command handler (+0x1cb930) turns into Hud event 31 on the same Hud. */
+#define EV_SKIP_CUTSCENE 31
+
+int mc3_hud_skip(void) {
+  uint8_t *hud = mc3_hud();
+  uint8_t *ev = hud ? *(uint8_t **)(hud + HUD_EVENTS) : NULL;
+  if (!ev)
+    return 0;
+  ev[EV_SKIP_CUTSCENE] = 1;
+  debugPrintf("[hud] +: skip the cutscene (event %d)\n", EV_SKIP_CUTSCENE);
+  return 1;
+}
+
 /* ---------------------------------------------------------------- logo
  * On Android the activity showed Gameloft's logo video before the game
  * (the engine knows it as <SD folder>/video/LOGO_Gameloft_320x480.mp4).
