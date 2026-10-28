@@ -6,7 +6,7 @@
 #---------------------------------------------------------------------------------
 TARGET               := mc3_nx
 PORT_NPDM_PROGRAM_ID := 0x01000000000010C3
-PORT_NPDM_VERSION    := 1.0.0
+PORT_NPDM_VERSION    := 1.0.1
 # The engine ran on a 9 MB stack in the PS Vita port; here it runs on main.
 PORT_NPDM_MAIN_STACK := 0xA00000
 # The engine reads its OBB zips with many small freads.

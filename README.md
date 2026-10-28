@@ -15,7 +15,7 @@ Java (JNI) and OpenGL ES the game calls, answered by this port. Graphics are Mes
 **No game code or assets are included**, here or in the releases. You need your own copy of the game.
 
 > [!IMPORTANT]
-> **Version 1.0.0 — playable.** Tested on hardware through the first missions of the campaign: menus, gameplay,
+> **Version 1.0.1 — playable.** Tested on hardware through the first missions of the campaign: menus, gameplay,
 > sound, the Gameloft logo and the mission briefing videos, the pause / mission failed / debriefing screens, sleep
 > and HOME. 60 FPS target, 720p handheld / 1080p docked. Latest version: see [Releases](../../releases).
 
