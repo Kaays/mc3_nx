@@ -36,6 +36,12 @@ void mc3_input_poll(int in_gameplay);
 /* mc3_main.c: the Flash menu on top ("menu_csbars" in gameplay), or NULL. */
 const char *mc3_menu_name(void);
 
+/* mc3_main.c: the on-screen prompts the centre key acts on (MC3_PROMPT_*);
+ * only while the engine reports gameplay. */
+#define MC3_PROMPT_ANY  1 /* a prompt A (DPAD_CENTER) takes */
+#define MC3_PROMPT_DRAG 2 /* the DraggableQTE: a bar filled with a finger */
+int mc3_hud_prompts(void);
+
 /* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
 void mc3_video_requested(const char *name);
 

@@ -157,6 +157,46 @@ const char *mc3_menu_name(void) {
   return (int8_t)m[8] != -1 ? (const char *)(m + 9) : *(const char **)(m + 0x14);
 }
 
+/* ---------------------------------------------------------------- hud
+ * What the Xperia Play's centre key would act on. The game's own key path
+ * (libModernCombat3.so+0x20bae0, the Hud's controls: Xperia keys through the
+ * engine's key state) turns DPAD_CENTER into a Hud event when one of these
+ * HUD controls is up, and does nothing with it otherwise:
+ *   ClickableObject (+0x7ac, the button that follows a computer, a door...),
+ *   ClickableQTE (+0x7b0), DraggableQTE (+0x7b4)            -> event 34, "use"
+ *   GrenadeThrowback (+0x7f0) -> 23   MeleeBack (+0x7f4) -> 10
+ *   +0xa78 -> 4, +0xa7c -> 5, +0x818 -> 37 (the other on-screen prompts)
+ * A control is up when its byte +0x78 is set. The Hud is the game object's
+ * (.bss +0x950e08) +0x18, the one that function is called with (+0x14d1c4).
+ * Plain reads, each pointer checked. Bit 1: a prompt is up; bit 2: the
+ * DraggableQTE (the bar filled with a finger). */
+#define MC3_GAME_OBJ 0x00950e08u
+
+static int ctl_up(const uint8_t *hud, unsigned off) {
+  const uint8_t *c = *(const uint8_t *const *)(hud + off);
+  return c && c[0x78];
+}
+
+int mc3_hud_prompts(void) {
+  uintptr_t b = (uintptr_t)g_mc3_mod.load_virtbase;
+  if (!b)
+    return 0;
+  const uint8_t *gp = *(const uint8_t *const *)(b + MC3_GAME_OBJ);
+  if (!gp)
+    return 0;
+  const uint8_t *hud = *(const uint8_t *const *)(gp + 0x18);
+  if (!hud)
+    return 0;
+  static const unsigned prompts[] = {0x7ac, 0x7b0, 0x7b4, 0x7f0, 0x7f4, 0xa78, 0xa7c, 0x818};
+  int r = 0;
+  for (unsigned i = 0; i < sizeof prompts / sizeof prompts[0]; i++)
+    if (ctl_up(hud, prompts[i]))
+      r |= MC3_PROMPT_ANY;
+  if (ctl_up(hud, 0x7b4))
+    r |= MC3_PROMPT_DRAG;
+  return r;
+}
+
 /* ---------------------------------------------------------------- logo
  * On Android the activity showed Gameloft's logo video before the game
  * (the engine knows it as <SD folder>/video/LOGO_Gameloft_320x480.mp4).

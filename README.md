@@ -25,9 +25,6 @@ Java (JNI) and OpenGL ES the game calls, answered by this port. Graphics are Mes
   sprint key every time (`debug.log` shows it); the game keeps its "out of breath" state. Not yet known whether the
   Android game does the same.
 - **Multiplayer does not work**: Gameloft's servers are gone (the same on Android).
-- **A does nothing during play itself** (it does in every menu): the PS Vita port found that the Xperia "select" key
-  triggers an engine bug there. In-game prompts (doors, pick-ups) are the game's on-screen buttons: use the touch
-  screen in handheld.
 
 ## What you need
 
@@ -92,7 +89,7 @@ itself. Your saves and settings stay. **Uninstall**: delete the forwarder in the
 | R | Grenade | — |
 | L | Next weapon | — |
 | B | Crouch | Back |
-| A | — | Select |
+| A | Use the prompt on screen (computer, door, bomb, grenade throw-back, melee counter, QTE) | Select |
 | L3 (click) | Sprint on/off ([sprint_toggle](#configini)) | — |
 | D-pad up (hold) | Sprint | Up |
 | D-pad down | Crouch | Down |
@@ -102,6 +99,10 @@ itself. Your saves and settings stay. **Uninstall**: delete the forwarder in the
 
 On every screen over gameplay (pause, mission failed, debriefing, skippable animations) A selects and B goes back:
 the port reads which menu the game has on top. Videos (the Gameloft logo, the briefings): A, B, + or a tap skips.
+
+In play, A is sent only while the game shows a prompt it would act on (the port reads the HUD), as the Xperia
+Play's centre key. **Quick-time events** with a bar filled by a finger: the touch screen works as on a phone, and the
+right stick is the finger too (docked play): flick it the way the finger would swipe, again and again.
 
 ## config.ini
 

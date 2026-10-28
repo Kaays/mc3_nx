@@ -13,7 +13,7 @@
  *   Y  reload (X 99)            X  BUTTON_Y 100
  *   R  grenade (MOVE_END 123)   L  next weapon (DPAD_RIGHT 22)
  *   B  crouch (DPAD_DOWN 20)  / back (BACK 4)
- *   A  --                     / select (DPAD_CENTER 23)
+ *   A  use (DPAD_CENTER 23)    / select (DPAD_CENTER 23)
  *   L3 sprint (DPAD_UP 19)      D-pad: up sprint, down crouch, left/right weapon
  * The game sprints while DPAD_UP is held. Holding a stick click down while
  * running is hard (hardware: the thumb slipped, sprint/walk flickered, and the
@@ -21,12 +21,16 @@
  * click and the port holds DPAD_UP until another click, the left stick let go
  * for a moment, aiming (ZL), or leaving play. The D-pad's up stays a hold.
  *   +  START 108                -  SELECT 109
- * A is off in gameplay as on the Vita: DPAD_CENTER there triggers an engine
- * bug the Vita port found. On the game's other menus over gameplay (pause,
+ * A in gameplay: the Xperia Play's centre key, which the game turns into
+ * whatever prompt is on screen (a computer, a door, a bomb, a grenade to
+ * throw back, a melee counter, a QTE: mc3_hud_prompts). The Vita port kept it
+ * off in gameplay for an engine bug it did not describe, so here it is sent
+ * only while such a prompt is up -- when the game's own key path would use
+ * it -- and never otherwise. On the game's other menus over gameplay (pause,
  * mission failed, debriefing: mc3_menu_name) A selects and B goes back, as
- * in the other menus. In-game
- * prompts (doors, pick-ups) are the game's on-screen buttons: the touch
- * screen in handheld.
+ * in the other menus. The bar filled with a finger (DraggableQTE) also takes
+ * the right stick as a finger, for docked play: flick it the way the finger
+ * would swipe, again and again.
  *
  * A key held by two buttons at once is pressed once and released when the
  * last one lets go; each button releases the key it pressed even if the
@@ -76,7 +80,7 @@ static const Map k_map[] = {
     {HidNpadButton_R, AK_MOVE_END, AK_MOVE_END},
     {HidNpadButton_L, AK_DPAD_RIGHT, AK_NONE},
     {HidNpadButton_B, AK_DPAD_DOWN, AK_BACK},
-    {HidNpadButton_A, AK_NONE, AK_DPAD_CENTER},
+    {HidNpadButton_A, AK_DPAD_CENTER, AK_DPAD_CENTER}, /* in play: only on a prompt */
     {HidNpadButton_StickL, AK_DPAD_UP, AK_NONE},
     {HidNpadButton_Up, AK_DPAD_UP, AK_DPAD_UP},
     {HidNpadButton_Down, AK_DPAD_DOWN, AK_DPAD_DOWN},
@@ -262,6 +266,32 @@ static void track_pause(int in_gameplay, u64 pressed, u64 held, float lx, float 
   }
 }
 
+/* The right stick as a finger on the DraggableQTE: down in the middle of the
+ * screen when the stick leaves the centre, following it up to a third of
+ * the screen away, up when it comes back or the bar goes. */
+#define QTE_FINGER 15
+static int g_qte_finger;
+
+static void qte_stick(int drag, float x, float y) {
+  if (!f_touch)
+    return;
+  int w = 1280, h = 720;
+  dcr_window_size(&w, &h);
+  float mag = sqrtf(x * x + y * y);
+  int cx = w / 2, cy = h / 2;
+  int px = cx + (int)(x * (float)h / 3), py = cy + (int)(y * (float)h / 3);
+  if (drag && !g_qte_finger && mag > 0.5f) {
+    f_touch(g_jni_env, g_cls, 1, cx, cy, QTE_FINGER);
+    f_touch(g_jni_env, g_cls, 2, px, py, QTE_FINGER);
+    g_qte_finger = 1;
+  } else if (g_qte_finger && drag && mag > 0.3f) {
+    f_touch(g_jni_env, g_cls, 2, px, py, QTE_FINGER);
+  } else if (g_qte_finger) {
+    f_touch(g_jni_env, g_cls, 0, px, py, QTE_FINGER);
+    g_qte_finger = 0;
+  }
+}
+
 void mc3_input_poll(int in_gameplay) {
   padUpdate(&g_pad);
   float sticks[4] = {0};
@@ -284,6 +314,14 @@ void mc3_input_poll(int in_gameplay) {
   else
     track_pause(in_gameplay, pressed, held, sticks[0], sticks[1]);
   int game_keys = in_gameplay && (menu ? !strcmp(menu, "menu_csbars") : !g_pause_menu);
+  int prompts = in_gameplay ? mc3_hud_prompts() : 0;
+  static int last_prompts;
+  if (prompts != last_prompts) {
+    debugPrintf("[input] %s\n", prompts & MC3_PROMPT_DRAG  ? "drag bar up: touch and the right stick"
+                                 : prompts & MC3_PROMPT_ANY ? "prompt up: A uses it"
+                                                            : "no prompt");
+    last_prompts = prompts;
+  }
   static int was_game_keys;
   if (game_keys && !was_game_keys)
     resync_play();
@@ -295,6 +333,8 @@ void mc3_input_poll(int in_gameplay) {
     int down = (held & k_map[i].button) != 0;
     if (down && !g_held_key[i]) {
       int k = game_keys ? k_map[i].key_game : k_map[i].key_menu;
+      if (game_keys && k_map[i].button == HidNpadButton_A && !(prompts & MC3_PROMPT_ANY))
+        k = 0; /* no prompt: the centre key stays off in play, as on the Vita */
       if (k) {
         g_held_key[i] = k;
         key(k, 1);
@@ -315,6 +355,7 @@ void mc3_input_poll(int in_gameplay) {
   /* right: look (the engine's y grows downward) */
   float rx = sticks[2], ry = sticks[3];
   deadzone(&rx, &ry);
+  qte_stick(prompts & MC3_PROMPT_DRAG, rx, -ry); /* screen y grows downwards */
   float sp = g_mc3_cfg.look_speed;
   feed(&g_right, f_pad_right, rx * sp, (g_mc3_cfg.invert_y ? ry : -ry) * sp, 2);
 
