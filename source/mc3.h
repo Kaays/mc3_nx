@@ -45,6 +45,8 @@ int mc3_hud_prompts(void);
 int mc3_hud_use(void);
 /* + in a skippable cutscene: the ">>" button's SkipCutscene. 1 if sent. */
 int mc3_hud_skip(void);
+/* 1 while a cutscene plays (the player character flagged in one). */
+int mc3_hud_cutscene(void);
 
 /* mc3_main.c: a briefing video was asked for (mc3_jni.c). */
 void mc3_video_requested(const char *name);

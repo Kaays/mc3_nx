@@ -20,8 +20,8 @@
  * breathing sound went on), so by default L3 is a toggle (sprint_toggle): one
  * click and the port holds DPAD_UP until another click, the left stick let go
  * for a moment, aiming (ZL), or leaving play. The D-pad's up stays a hold.
- *   +  START 108 (in a skippable cutscene, menu_SkipAnim: skip it, as the
- *      ">>" button)              -  SELECT 109
+ *   +  START 108 (in a cutscene: skip it, as the ">>" button; never START
+ *      there)                    -  SELECT 109
  * A in gameplay: what the Xperia Play's centre key does there -- the prompt
  * on screen (a computer, a door, a bomb, a weapon on the ground, a grenade to
  * throw back, a melee counter, a QTE) -- without the key itself, which the
@@ -323,8 +323,17 @@ void mc3_input_poll(int in_gameplay) {
                                                             : "no prompt");
     last_prompts = prompts;
   }
-  int skip_anim = menu && !strcmp(menu, "menu_SkipAnim");
-  if (skip_anim && (pressed & HidNpadButton_Plus))
+  /* + in a cutscene skips it (as the ">>" button) and never reaches the game
+   * as START, which it kept and opened the pause menu with afterwards;
+   * not while a QTE prompt is up. menu_SkipAnim: the skip under way. */
+  int cutscene = in_gameplay && mc3_hud_cutscene();
+  static int last_cutscene;
+  if (cutscene != last_cutscene) {
+    debugPrintf("[input] %s\n", cutscene ? "cutscene: + skips it" : "cutscene over");
+    last_cutscene = cutscene;
+  }
+  int skip_anim = cutscene || (menu && !strcmp(menu, "menu_SkipAnim"));
+  if (cutscene && (pressed & HidNpadButton_Plus) && !(prompts & MC3_PROMPT_ANY))
     mc3_hud_skip();
   static int was_game_keys;
   if (game_keys && !was_game_keys)

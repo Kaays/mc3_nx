@@ -263,9 +263,20 @@ int mc3_hud_use(void) {
   return 1;
 }
 
-/* + in a skippable cutscene (menu_SkipAnim, the ">>" button in the corner):
- * what that button sends, the Flash command "SkipCutscene", which the game's
- * command handler (+0x1cb930) turns into Hud event 31 on the same Hud. */
+/* In a cutscene: the Hud's player character (+0x58) flagged in one (+0x744),
+ * what the Hud's cutscene start (+0x20a2c0, which shows the ">>" button)
+ * and its skip handling read. The HUD menu stays menu_csbars meanwhile
+ * (hardware: + there went to the game as START and paused it as soon as the
+ * cutscene ended). */
+int mc3_hud_cutscene(void) {
+  const uint8_t *hud = mc3_hud();
+  const uint8_t *ch = hud ? *(const uint8_t *const *)(hud + 0x58) : NULL;
+  return ch && ch[0x744];
+}
+
+/* + in a cutscene: what the ">>" button in the corner sends, the Flash
+ * command "SkipCutscene", which the game's command handler (+0x1cb930) turns
+ * into Hud event 31 on the same Hud; the Hud acts on it only in a cutscene. */
 #define EV_SKIP_CUTSCENE 31
 
 int mc3_hud_skip(void) {
